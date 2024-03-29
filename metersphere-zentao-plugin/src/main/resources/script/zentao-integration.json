@@ -33,7 +33,6 @@
       "type": "RADIO",
       "label": "请求方式",
       "value": "PATH_INFO",
-      "required": true,
       "tooltip": "参考禅道配置文件中 $config->requestType 的值",
       "options": [
         {

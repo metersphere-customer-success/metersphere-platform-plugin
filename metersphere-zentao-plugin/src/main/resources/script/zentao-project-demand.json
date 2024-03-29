@@ -8,7 +8,6 @@
         "type": "RADIO",
         "label": "范围",
         "value": "products",
-        "required": true,
         "subDesc": "",
         "options": [
           {
