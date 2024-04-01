@@ -91,8 +91,11 @@ public class JiraPlatform extends AbstractPlatform {
 	public void validateProjectConfig(String projectConfigStr) {
 		try {
 			JiraProjectConfig projectConfig = getProjectConfig(projectConfigStr);
+			if (StringUtils.isBlank(projectConfig.getJiraKey())) {
+				throw new MSPluginException("JIRA项目校验参数不能为空!");
+			}
 			JiraIssueProject project = jiraClient.getProject(projectConfig.getJiraKey());
-			if (project != null && StringUtils.isBlank(project.getId())) {
+			if (project == null || StringUtils.isBlank(project.getId())) {
 				throw new MSPluginException("项目不存在");
 			}
 		} catch (Exception e) {

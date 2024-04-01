@@ -103,6 +103,9 @@ public class JiraDefaultClient extends BaseClient {
 	 */
 	public List<JiraIssueType> getIssueType(String projectKey) {
 		JiraIssueProject project = getProject(projectKey);
+		if (project == null || StringUtils.isBlank(project.getId())) {
+			throw new MSPluginException("项目不存在");
+		}
 		String url = getUrl(JiraApiUrl.GET_ISSUE_TYPE);
 		ResponseEntity<String> response;
 		try {
@@ -110,7 +113,7 @@ public class JiraDefaultClient extends BaseClient {
 		} catch (HttpClientErrorException e) {
 			// SaaS 的jira才有这个接口，报错则调用其他接口
 			if (HttpStatus.NOT_FOUND.isSameCodeAs(e.getStatusCode())) {
-				return this.getProject(projectKey).getIssueTypes();
+				return project.getIssueTypes();
 			}
 			PluginLogUtils.error(e.getMessage(), e);
 			throw new MSPluginException(e.getMessage());
@@ -134,7 +137,7 @@ public class JiraDefaultClient extends BaseClient {
 			response = restTemplate.exchange(url, HttpMethod.GET, getAuthHttpEntity(), String.class);
 		} catch (Exception e) {
 			PluginLogUtils.error(e.getMessage(), e);
-			throw new MSPluginException(e.getMessage());
+			return null;
 		}
 		return getResultForObject(JiraIssueProject.class, response);
 	}
