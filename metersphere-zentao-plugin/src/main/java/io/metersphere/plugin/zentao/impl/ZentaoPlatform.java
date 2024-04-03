@@ -85,6 +85,10 @@ public class ZentaoPlatform extends AbstractPlatform {
 	 */
 	@Override
 	public void validateUserConfig(String userConfig) {
+		ZentaoPlatformUserInfo platformConfig = PluginUtils.parseObject(userConfig, ZentaoPlatformUserInfo.class);
+		if (StringUtils.isBlank(platformConfig.getZentaoAccount()) && StringUtils.isBlank(platformConfig.getZentaoPassword())) {
+			throw new MSPluginException("禅道认证失败: 账号或密码为空");
+		}
 		setUserConfig(userConfig, true);
 		zentaoRestClient.auth();
 	}

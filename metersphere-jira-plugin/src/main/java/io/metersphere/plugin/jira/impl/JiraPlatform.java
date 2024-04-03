@@ -78,6 +78,11 @@ public class JiraPlatform extends AbstractPlatform {
 	 */
 	@Override
 	public void validateUserConfig(String userConfig) {
+		JiraUserPlatformInfo platformConfig = PluginUtils.parseObject(userConfig, JiraUserPlatformInfo.class);
+		if (StringUtils.isBlank(platformConfig.getJiraAccount()) && StringUtils.isBlank(platformConfig.getJiraPassword())
+				&& StringUtils.isBlank(platformConfig.getToken())) {
+			throw new MSPluginException("JIRA认证失败: 账号或密码(Token)为空");
+		}
 		setUserConfig(userConfig, true);
 		jiraClient.auth();
 	}
@@ -192,20 +197,15 @@ public class JiraPlatform extends AbstractPlatform {
 	public List<PlatformCustomFieldItemDTO> getDefaultTemplateCustomField(String projectConfigStr) {
 		projectConfig = getProjectConfig(projectConfigStr);
 		Map<String, String> optionData = prepareOptionData();
-		Map<String, JiraCreateMetadataResponse.Field> createMetadata = jiraClient.getCreateMetadata(projectConfig.getJiraKey(),
+		List<JiraCreateMetaFieldsResponse.Field> metaFields = jiraClient.getCreateMetadata(projectConfig.getJiraKey(),
 				projectConfig.getJiraBugTypeId());
 
 		List<PlatformCustomFieldItemDTO> fields = new ArrayList<>();
 		Character filedKey = 'A';
-		for (String name : createMetadata.keySet()) {
-			if (StringUtils.equals(JiraMetadataField.ATTACHMENT_NAME, name)) {
-				// skip attachment field
-				continue;
-			}
-			JiraCreateMetadataResponse.Field item = createMetadata.get(name);
-			JiraCreateMetadataResponse.Schema schema = item.getSchema();
+		for (JiraCreateMetaFieldsResponse.Field item : metaFields) {
+			JiraCreateMetaFieldsResponse.Schema schema = item.getSchema();
 			PlatformCustomFieldItemDTO customField = new PlatformCustomFieldItemDTO();
-			setCustomFieldBaseProperty(item, customField, name, filedKey);
+			setCustomFieldBaseProperty(item, customField, item.getFieldId(), filedKey);
 			setCustomFieldTypeAndOption(schema, customField, item.getAllowedValues(), optionData);
 			setCustomFieldDefaultValue(customField, item);
 			fields.add(customField);
@@ -871,17 +871,17 @@ public class JiraPlatform extends AbstractPlatform {
 	 * @param name        名称
 	 * @param filedKey    唯一KEY
 	 */
-	private void setCustomFieldBaseProperty(JiraCreateMetadataResponse.Field item, PlatformCustomFieldItemDTO customField, String name, Character filedKey) {
+	private void setCustomFieldBaseProperty(JiraCreateMetaFieldsResponse.Field item, PlatformCustomFieldItemDTO customField, String name, Character filedKey) {
 		customField.setId(name);
 		customField.setName(item.getName());
 		customField.setKey(String.valueOf(filedKey++));
 		customField.setCustomData(name);
-		if (StringUtils.equals(JiraMetadataField.SUMMARY_FIELD_NAME, item.getKey())) {
+		if (StringUtils.equals(JiraMetadataField.SUMMARY_FIELD_NAME, item.getFieldId())) {
 			customField.setRequired(true);
 		} else {
 			customField.setRequired(item.isRequired());
 		}
-		if (StringUtils.equalsAnyIgnoreCase(item.getKey(), JiraMetadataField.SUMMARY_FIELD_NAME, JiraMetadataField.DESCRIPTION_FIELD_NAME, JiraMetadataField.ENVIRONMENT_FIELD_NAME)) {
+		if (StringUtils.equalsAnyIgnoreCase(item.getFieldId(), JiraMetadataField.SUMMARY_FIELD_NAME, JiraMetadataField.DESCRIPTION_FIELD_NAME, JiraMetadataField.ENVIRONMENT_FIELD_NAME)) {
 			customField.setSystemField(true);
 		} else {
 			customField.setSystemField(false);
@@ -895,8 +895,8 @@ public class JiraPlatform extends AbstractPlatform {
 	 * @param customField   自定义字段
 	 * @param allowedValues 允许的选项值
 	 */
-	private void setCustomFieldTypeAndOption(JiraCreateMetadataResponse.Schema schema, PlatformCustomFieldItemDTO customField,
-											 List<JiraCreateMetadataResponse.AllowedValues> allowedValues, Map<String, String> optionData) {
+	private void setCustomFieldTypeAndOption(JiraCreateMetaFieldsResponse.Schema schema, PlatformCustomFieldItemDTO customField,
+											 List<JiraCreateMetaFieldsResponse.AllowedValues> allowedValues, Map<String, String> optionData) {
 		Set<String> specialCustomFieldType = new HashSet<>(JiraMetadataSpecialCustomField.getSpecialFields());
 		String customType = schema.getCustom();
 		if (StringUtils.isNotBlank(customType)) {
@@ -939,7 +939,7 @@ public class JiraPlatform extends AbstractPlatform {
 	 * @param schema      jira field schema
 	 * @param customField 自定义字段
 	 */
-	private void handleSpecialCustomFieldType(JiraCreateMetadataResponse.Schema schema, PlatformCustomFieldItemDTO customField, Map<String, String> optionData) {
+	private void handleSpecialCustomFieldType(JiraCreateMetaFieldsResponse.Schema schema, PlatformCustomFieldItemDTO customField, Map<String, String> optionData) {
 		String customType = schema.getCustom();
 		String specialCustomFieldTypesOfSchemaType = "project";
 		String arraySchemaType = "array";
@@ -1004,7 +1004,7 @@ public class JiraPlatform extends AbstractPlatform {
 	 * @param schema      jira field schema
 	 * @param customField 自定义字段
 	 */
-	private void handleSpecialSystemFieldType(JiraCreateMetadataResponse.Schema schema, PlatformCustomFieldItemDTO customField, Map<String, String> optionData) {
+	private void handleSpecialSystemFieldType(JiraCreateMetaFieldsResponse.Schema schema, PlatformCustomFieldItemDTO customField, Map<String, String> optionData) {
 		if (StringUtils.equals(schema.getType(), JiraMetadataSpecialSystemField.TIME_TRACKING)) {
 			// TIME_TRACKING (特殊系统字段)
 			customField.setId(JiraMetadataField.ORIGINAL_ESTIMATE_TRACKING_FIELD_ID);
@@ -1043,7 +1043,7 @@ public class JiraPlatform extends AbstractPlatform {
 	 * @param customField 自定义字段
 	 * @param item        Jira字段
 	 */
-	private void setCustomFieldDefaultValue(PlatformCustomFieldItemDTO customField, JiraCreateMetadataResponse.Field item) {
+	private void setCustomFieldDefaultValue(PlatformCustomFieldItemDTO customField, JiraCreateMetaFieldsResponse.Field item) {
 		if (item.isHasDefaultValue()) {
 			Object defaultValue = item.getDefaultValue();
 			if (defaultValue != null) {
@@ -1207,7 +1207,7 @@ public class JiraPlatform extends AbstractPlatform {
 	 * @param allowedValues 允许的选项值
 	 * @return 选项集合
 	 */
-	private List<JiraAllowedValueOption> handleAllowedValuesOptions(List<JiraCreateMetadataResponse.AllowedValues> allowedValues) {
+	private List<JiraAllowedValueOption> handleAllowedValuesOptions(List<JiraCreateMetaFieldsResponse.AllowedValues> allowedValues) {
 		if (CollectionUtils.isEmpty(allowedValues)) {
 			return null;
 		}
@@ -1411,41 +1411,40 @@ public class JiraPlatform extends AbstractPlatform {
 	 */
 	private void setSpecialParam(Map<String, Object> fields) {
 		try {
-			Map<String, JiraCreateMetadataResponse.Field> createMetadata = jiraClient.getCreateMetadata(projectConfig.getJiraKey(), projectConfig.getJiraBugTypeId());
-			for (String key : createMetadata.keySet()) {
-				JiraCreateMetadataResponse.Field item = createMetadata.get(key);
-				JiraCreateMetadataResponse.Schema schema = item.getSchema();
+			List<JiraCreateMetaFieldsResponse.Field> metaFields = jiraClient.getCreateMetadata(projectConfig.getJiraKey(), projectConfig.getJiraBugTypeId());
+			for (JiraCreateMetaFieldsResponse.Field item : metaFields) {
+				JiraCreateMetaFieldsResponse.Schema schema = item.getSchema();
 
-				if (StringUtils.equals(key, JiraMetadataSpecialSystemField.TIME_TRACKING)) {
+				if (StringUtils.equals(item.getFieldId(), JiraMetadataSpecialSystemField.TIME_TRACKING)) {
 					if (fields.get(JiraMetadataField.ORIGINAL_ESTIMATE_TRACKING_FIELD_ID) != null || fields.get(JiraMetadataField.REMAINING_ESTIMATE_TRACKING_FIELD_ID) != null) {
 						// 原始预估, 时间追踪有值时, 封装timetracking
 						Map<String, Object> newField = new LinkedHashMap<>();
 						// originalEstimate -> 2d 转成 timetracking : { originalEstimate: 2d}
 						newField.put(JiraMetadataField.ORIGINAL_ESTIMATE_TRACKING_FIELD_ID, fields.get(JiraMetadataField.ORIGINAL_ESTIMATE_TRACKING_FIELD_ID));
 						newField.put(JiraMetadataField.REMAINING_ESTIMATE_TRACKING_FIELD_ID, fields.get(JiraMetadataField.REMAINING_ESTIMATE_TRACKING_FIELD_ID));
-						fields.put(key, newField);
+						fields.put(item.getFieldId(), newField);
 					}
 					fields.remove(JiraMetadataField.ORIGINAL_ESTIMATE_TRACKING_FIELD_ID);
 					fields.remove(JiraMetadataField.REMAINING_ESTIMATE_TRACKING_FIELD_ID);
 				}
-				if (schema == null || fields.get(key) == null) {
+				if (schema == null || fields.get(item.getFieldId()) == null) {
 					continue;
 				}
 				if (schema.getCustom() != null) {
 					if (schema.getCustom().endsWith(JiraMetadataSpecialCustomField.SPRINT_FIELD_NAME)) {
-						Map field = (Map) fields.get(key);
+						Map field = (Map) fields.get(item.getFieldId());
 						Object id = field.get("id");
 						if (id != null) {
 							// sprint 传参数比较特殊，需要要传数值
-							fields.put(key, Integer.parseInt(id.toString()));
+							fields.put(item.getFieldId(), Integer.parseInt(id.toString()));
 						}
 					} else if (schema.getCustom().endsWith("pic-link")) {
 						// 特殊Link
-						Map field = (Map) fields.get(key);
-						fields.put(key, field.get("id"));
+						Map field = (Map) fields.get(item.getFieldId());
+						fields.put(item.getFieldId(), field.get("id"));
 					} else if (schema.getCustom().endsWith("multiuserpicker")) {
 						// 多选用户列表
-						List<Map> userItems = (List) fields.get(key);
+						List<Map> userItems = (List) fields.get(item.getFieldId());
 						userItems.forEach(i -> {
 							i.put("name", i.get("id"));
 							i.put("id", i.get("id"));
@@ -1454,14 +1453,14 @@ public class JiraPlatform extends AbstractPlatform {
 				}
 				if (schema.getType() != null) {
 					if (schema.getType().endsWith("user")) {
-						Map field = (Map) fields.get(key);
+						Map field = (Map) fields.get(item.getFieldId());
 						// 如果不是用户ID，则是用户的key，参数调整为key
 						Map newField = new LinkedHashMap<>();
 						// name 是私有化部署使用
 						newField.put("name", field.get("id").toString());
 						// id 是SaaS使用
 						newField.put("id", field.get("id").toString());
-						fields.put(key, newField);
+						fields.put(item.getFieldId(), newField);
 					}
 				}
 			}

@@ -21,12 +21,11 @@ import org.springframework.web.client.RequestCallback;
 
 import java.io.File;
 import java.io.InputStream;
-import java.net.URI;
-import java.net.URISyntaxException;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.function.Consumer;
+import java.util.stream.Collectors;
 
 public class JiraDefaultClient extends BaseClient {
 
@@ -74,10 +73,10 @@ public class JiraDefaultClient extends BaseClient {
 	 * @param issueType  缺陷类型
 	 * @return 返回元数据字段Map
 	 */
-	public Map<String, JiraCreateMetadataResponse.Field> getCreateMetadata(String projectKey, String issueType) {
-		String url = getBaseUrl() + JiraApiUrl.CREATE_META;
+	public List<JiraCreateMetaFieldsResponse.Field> getCreateMetadata(String projectKey, String issueType) {
+		String url = getBaseUrl() + JiraApiUrl.CREATE_META_FOR_TYPE;
 		ResponseEntity<String> response;
-		Map<String, JiraCreateMetadataResponse.Field> fields;
+		List<JiraCreateMetaFieldsResponse.Field> metaFields = new ArrayList<>();
 		try {
 			response = restTemplate.exchange(url, HttpMethod.GET, getAuthHttpEntity(), String.class, projectKey, issueType);
 		} catch (Exception e) {
@@ -85,14 +84,20 @@ public class JiraDefaultClient extends BaseClient {
 			throw new MSPluginException(e.getMessage());
 		}
 		try {
-			fields = getResultForObject(JiraCreateMetadataResponse.class, response).getProjects().get(0).getIssuetypes().get(0).getFields();
+			metaFields = getResultForObject(JiraCreateMetaFieldsResponse.class, response).getFields();
+			// 兼容一些旧的环境
+			if (CollectionUtils.isEmpty(metaFields)) {
+				metaFields = getResultForObject(JiraCreateMetaFieldsResponse.class, response).getValues();
+			}
 		} catch (Exception e) {
 			PluginLogUtils.error(e);
 			throw new MSPluginException("请检查服务集成信息或Jira项目ID");
 		}
-		fields.remove("project");
-		fields.remove("issuetype");
-		return fields;
+		if (CollectionUtils.isEmpty(metaFields)) {
+			return new ArrayList<>();
+		}
+		return metaFields.stream().filter(field -> !StringUtils.equals(field.getFieldId(), "project") && !StringUtils.equals(field.getFieldId(), "issuetype"))
+				.collect(Collectors.toList());
 	}
 
 	/**
@@ -488,17 +493,6 @@ public class JiraDefaultClient extends BaseClient {
 	}
 
 	/**
-	 * 获取认证头(Json)
-	 *
-	 * @return 返回认证头
-	 */
-	protected HttpHeaders getAuthJsonHeader() {
-		HttpHeaders headers = getAuthHeader();
-		headers.setContentType(MediaType.APPLICATION_JSON);
-		return headers;
-	}
-
-	/**
 	 * 获取需求请求URL
 	 *
 	 * @return 返回请求URL
@@ -624,29 +618,6 @@ public class JiraDefaultClient extends BaseClient {
 	 */
 	public JiraIssueListResponse getProjectIssuesAttachment(Integer startAt, Integer maxResults, String projectKey, String issueType, SyncAllBugRequest syncRequest) {
 		return getProjectIssues(startAt, maxResults, projectKey, issueType, syncRequest, JiraMetadataField.ATTACHMENT_NAME);
-	}
-
-	/**
-	 * 代理接口
-	 *
-	 * @param path                路径
-	 * @param responseEntityClazz 响应对象类型
-	 * @return 响应内容
-	 */
-	public ResponseEntity<?> proxyForGet(String path, Class<?> responseEntityClazz) {
-		PluginLogUtils.info("jira proxyForGet: " + path);
-		String endpoint = ENDPOINT;
-		try {
-			// ENDPOINT 可能会带有前缀，比如 http://xxxx/jira
-			// 这里去掉 /jira，再拼接图片路径path
-			URI uri = new URI(ENDPOINT);
-			endpoint = uri.getScheme() + "://" + uri.getHost() + ":" + uri.getPort();
-		} catch (URISyntaxException e) {
-			PluginLogUtils.error(e);
-		}
-		String url = endpoint + path;
-		validateProxyUrl(url, "/secure/attachment", "/attachment/content");
-		return restTemplate.exchange(url, HttpMethod.GET, getAuthHttpEntity(), responseEntityClazz);
 	}
 
 	/**
