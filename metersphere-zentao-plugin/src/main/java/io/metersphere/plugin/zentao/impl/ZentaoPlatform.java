@@ -731,8 +731,11 @@ public class ZentaoPlatform extends AbstractPlatform {
 									values.add(attr);
 								}
 							});
-							field.setValue(values);
+							field.setValue(PluginUtils.toJSONString(values));
 						}
+					} else if (value.toString().contains(",")) {
+						List<String> values = new ArrayList<>(Arrays.asList(value.toString().split(",")));
+						field.setValue(PluginUtils.toJSONString(values));
 					} else {
 						field.setValue(value.toString());
 					}
