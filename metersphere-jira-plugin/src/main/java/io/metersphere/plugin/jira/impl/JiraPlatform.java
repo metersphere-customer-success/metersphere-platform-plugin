@@ -1961,22 +1961,26 @@ public class JiraPlatform extends AbstractPlatform {
 						String msLocalUrl = group.substring(group.indexOf("<img src=") + 9).replaceAll("\"", StringUtils.EMPTY).replaceAll(StringUtils.SPACE, StringUtils.EMPTY);
 						replaceText = "!" + jiraLocalUrl + "|width=1360,height=876,alt=\'" + msLocalUrl + "\'!";
 						remainImgNameFromRichText.add(jiraLocalUrl);
-						msFileMap.remove(split.substring(split.indexOf("fileid") + 7, split.indexOf("permalinksrc=")).replaceAll("\"", StringUtils.EMPTY).trim());
+						if (split.contains("fileid")) {
+							msFileMap.remove(split.substring(split.indexOf("fileid") + 7, split.indexOf("permalinksrc=")).replaceAll("\"", StringUtils.EMPTY).trim());
+						}
 					}
 				} else {
 					// ms-localUrl => !image-20240319-113551.png|alt=!
 					String msLocalUrl = split.substring(split.indexOf("permalinksrc=") + 13).replaceAll("\"", StringUtils.EMPTY);
-					String fileId = split.substring(split.indexOf("fileid") + 7, split.indexOf("permalinksrc="))
-							.replaceAll("\"", StringUtils.EMPTY).replaceAll(StringUtils.SPACE, StringUtils.EMPTY);
-					if (msFileMap.containsKey(fileId)) {
-						// rename ms image to jira  (rules: image-20201015-110015-uid.jpg)
-						String fileName = "image-" + UUID.randomUUID().toString() + ".jpg";
-						File sourceFile = msFileMap.get(fileId);
-						File targetFile = new File(sourceFile.getParent(), fileName);
-						sourceFile.renameTo(targetFile);
-						msFileMap.put(fileId, targetFile);
-						replaceText = "!" + fileName + "|width=1360,height=876,alt=\'" + msLocalUrl + "\'!";
-						content = content.replaceAll(split, split + " psrc=\"" + fileName + "\"");
+					if (split.contains("fileid")) {
+						String fileId = split.substring(split.indexOf("fileid") + 7, split.indexOf("permalinksrc="))
+								.replaceAll("\"", StringUtils.EMPTY).replaceAll(StringUtils.SPACE, StringUtils.EMPTY);
+						if (msFileMap.containsKey(fileId)) {
+							// rename ms image to jira  (rules: image-20201015-110015-uid.jpg)
+							String fileName = "image-" + UUID.randomUUID().toString() + ".jpg";
+							File sourceFile = msFileMap.get(fileId);
+							File targetFile = new File(sourceFile.getParent(), fileName);
+							sourceFile.renameTo(targetFile);
+							msFileMap.put(fileId, targetFile);
+							replaceText = "!" + fileName + "|width=1360,height=876,alt=\'" + msLocalUrl + "\'!";
+							content = content.replaceAll(split, split + " psrc=\"" + fileName + "\"");
+						}
 					}
 				}
 			} else {
