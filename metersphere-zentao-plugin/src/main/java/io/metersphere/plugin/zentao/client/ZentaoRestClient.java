@@ -108,6 +108,18 @@ public class ZentaoRestClient extends BaseClient {
 				throw new MSPluginException("产品或项目不存在!");
 			}
 		} catch (Exception e) {
+			if (HttpStatus.BAD_REQUEST.isSameCodeAs(((HttpClientErrorException.NotFound) e).getStatusCode())) {
+				throw new MSPluginException("校验项目或产品参数有误!");
+			}
+			if (HttpStatus.FORBIDDEN.isSameCodeAs(((HttpClientErrorException.NotFound) e).getStatusCode())) {
+				throw new MSPluginException("未通过认证, 无法校验项目或产品!");
+			}
+			if (HttpStatus.NOT_FOUND.isSameCodeAs(((HttpClientErrorException.NotFound) e).getStatusCode())) {
+				throw new MSPluginException("产品或项目不存在!");
+			}
+			if (((HttpClientErrorException.NotFound) e).getStatusCode().is5xxServerError()) {
+				throw new MSPluginException("校验失败, 服务器异常!");
+			}
 			throw new MSPluginException(UnicodeConvertUtils.unicodeToCn(e.getMessage()));
 		}
 	}
