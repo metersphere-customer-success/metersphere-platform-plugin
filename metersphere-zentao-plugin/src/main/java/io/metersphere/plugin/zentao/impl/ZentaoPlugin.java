@@ -5,7 +5,7 @@ import io.metersphere.plugin.platform.spi.AbstractPlatformPlugin;
 public class ZentaoPlugin extends AbstractPlatformPlugin {
 
 	public static final String ZENTAO_PLUGIN_NAME = "禅道";
-	private static final String LOGO_PATH = "static/zentao.jpg";
+	private static final String LOGO_PATH = "static/zentao.png";
 	private static final String DESCRIPTION = "禅道是专业的研发项目管理软件";
 
 	@Override
