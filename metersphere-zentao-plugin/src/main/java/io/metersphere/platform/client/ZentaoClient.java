@@ -211,7 +211,7 @@ public abstract class ZentaoClient extends BaseClient {
         String sessionId = login();
         ResponseEntity<String> response = restTemplate.exchange(requestUrl.getBuildsGetV17(),
                 HttpMethod.GET, getHttpEntity(), String.class, projectId, sessionId);
-        return (Map<String, Object>) JSON.parseMap(response.getBody()).get("data");
+        return (Map<String, Object>) JSON.parseMap((String) JSON.parseMap(response.getBody()).get("data"));
     }
 
     public String uploadFile(File file, String projectKey) {
