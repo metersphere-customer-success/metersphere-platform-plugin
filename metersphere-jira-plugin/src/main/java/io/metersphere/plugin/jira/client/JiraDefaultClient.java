@@ -73,25 +73,39 @@ public class JiraDefaultClient extends BaseClient {
 	 * @param issueType  缺陷类型
 	 * @return 返回元数据字段Map
 	 */
-	public List<JiraCreateMetaFieldsResponse.Field> getCreateMetadata(String projectKey, String issueType) {
+	public List<JiraCreateMetaField.Field> getCreateMetadata(String projectKey, String issueType) {
 		String url = getBaseUrl() + JiraApiUrl.CREATE_META_FOR_TYPE;
 		ResponseEntity<String> response;
-		List<JiraCreateMetaFieldsResponse.Field> metaFields = new ArrayList<>();
+		List<JiraCreateMetaField.Field> metaFields = new ArrayList<>();
 		try {
 			response = restTemplate.exchange(url, HttpMethod.GET, getAuthHttpEntity(), String.class, projectKey, issueType);
-		} catch (Exception e) {
-			PluginLogUtils.error(e.getMessage(), e);
-			throw new MSPluginException(e.getMessage());
-		}
-		try {
 			metaFields = getResultForObject(JiraCreateMetaFieldsResponse.class, response).getFields();
 			// 兼容一些旧的环境
 			if (CollectionUtils.isEmpty(metaFields)) {
 				metaFields = getResultForObject(JiraCreateMetaFieldsResponse.class, response).getValues();
 			}
 		} catch (Exception e) {
-			PluginLogUtils.error(e);
-			throw new MSPluginException("请检查服务集成信息或Jira项目ID");
+			if (HttpStatus.NOT_FOUND.isSameCodeAs(((HttpClientErrorException) e).getStatusCode())) {
+				try {
+					response = restTemplate.exchange(getBaseUrl() + JiraApiUrl.CREATE_META, HttpMethod.GET, getAuthHttpEntity(), String.class, projectKey, issueType);
+					Map<String, JiraCreateMetaField.Field> fieldsMap = ((JiraCreateMetaFields) getResultForObject(JiraCreateMetaFields.class, response))
+							.getProjects().get(0).getIssuetypes().get(0).getFields();
+					fieldsMap.keySet().forEach(fieldKey -> {
+						JiraCreateMetaField.Field field = fieldsMap.get(fieldKey);
+						if (StringUtils.isBlank(field.getFieldId())) {
+							// 设置唯一Key
+							field.setFieldId(fieldKey);
+						}
+					});
+					metaFields = fieldsMap.values().stream().collect(Collectors.toList());
+				} catch (Exception e1) {
+					PluginLogUtils.error(e1.getMessage(), e1);
+					throw new MSPluginException(e1.getMessage());
+				}
+			} else {
+				PluginLogUtils.error(e.getMessage(), e);
+				throw new MSPluginException(e.getMessage());
+			}
 		}
 		if (CollectionUtils.isEmpty(metaFields)) {
 			return new ArrayList<>();
