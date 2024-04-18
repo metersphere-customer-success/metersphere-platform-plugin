@@ -1613,7 +1613,14 @@ public class JiraPlatform extends AbstractPlatform {
 		if (assignMap == null) {
 			msBug.setHandleUser(StringUtils.EMPTY);
 		} else {
-			String assignUser = assignMap.get("accountId").toString();
+			String assignUser;
+			if (assignMap.containsKey("accountId")) {
+				assignUser = assignMap.get("accountId").toString();
+			} else if (assignMap.containsKey("key")) {
+				assignUser = assignMap.get("key").toString();
+			} else {
+				assignUser = StringUtils.EMPTY;
+			}
 			if (!StringUtils.equals(msBug.getHandleUser(), assignUser)) {
 				msBug.setHandleUser(assignUser);
 				msBug.setHandleUsers(StringUtils.isBlank(msBug.getHandleUsers()) ? assignUser : msBug.getHandleUsers() + "," + assignUser);
