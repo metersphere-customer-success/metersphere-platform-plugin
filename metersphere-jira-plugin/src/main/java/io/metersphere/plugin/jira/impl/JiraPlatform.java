@@ -823,16 +823,39 @@ public class JiraPlatform extends AbstractPlatform {
 		// prepare demand list
 		List<PlatformDemandDTO.Demand> demands = new ArrayList<>();
 		issues.forEach(issue -> {
-			// Jira目前只满足第一层级需求, 父子层级看后续需求
 			PlatformDemandDTO.Demand demand = new PlatformDemandDTO.Demand();
 			demand.setDemandId(issue.get("key").toString());
 			// noinspection unchecked
 			Map<String, Object> fieldMap = (Map<String, Object>) issue.get("fields");
 			demand.setDemandName(fieldMap.get("summary").toString());
+			// no special custom field for jira
 			demand.setDemandUrl(jiraClient.getBaseDemandUrl() + "/jira/software/projects/" + projectConfig.getJiraKey() + "/issues/" + issue.get("key").toString());
-			boolean isDemandShow = (StringUtils.isBlank(query) || StringUtils.containsIgnoreCase(demand.getDemandId(), query) || StringUtils.containsIgnoreCase(demand.getDemandName(), query)) &&
+			boolean isParentDemandShow = (StringUtils.isBlank(query) || StringUtils.containsIgnoreCase(demand.getDemandId(), query) || StringUtils.containsIgnoreCase(demand.getDemandName(), query)) &&
 					(CollectionUtils.isEmpty(excludeIds) || !excludeIds.contains(demand.getDemandId()));
-			if (isDemandShow) {
+			List<Map<String, Object>> childIssues = (List<Map<String, Object>>) fieldMap.get("subtasks");
+			if (!CollectionUtils.isEmpty(childIssues)) {
+				List<PlatformDemandDTO.Demand> childrenDemands = new ArrayList<>();
+				// handle children demand list
+				childIssues.forEach(childIssue -> {
+					PlatformDemandDTO.Demand childDemand = new PlatformDemandDTO.Demand();
+					childDemand.setDemandId(childIssue.get("key").toString());
+					// noinspection unchecked
+					Map<String, Object> childFieldMap = (Map<String, Object>) childIssue.get("fields");
+					childDemand.setDemandName(childFieldMap.get("summary").toString());
+					// no special custom field for jira
+					childDemand.setDemandUrl(jiraClient.getBaseDemandUrl() + "/jira/software/projects/" + projectConfig.getJiraKey() + "/issues/" + childIssue.get("key").toString());
+					childDemand.setParent(demand.getDemandId());
+					boolean isChildDemandShow = StringUtils.isBlank(query) || StringUtils.containsIgnoreCase(childDemand.getDemandName(), query) || StringUtils.equalsIgnoreCase(childDemand.getDemandId(), query) &&
+							(CollectionUtils.isEmpty(excludeIds) || !excludeIds.contains(demand.getDemandId()));
+					if (isChildDemandShow) {
+						childrenDemands.add(childDemand);
+					}
+				});
+				demand.setChildren(childrenDemands);
+			}
+
+			if (isParentDemandShow || !CollectionUtils.isEmpty(demand.getChildren())) {
+				// when parent demand is show, or children demands is not empty;
 				demands.add(demand);
 			}
 		});

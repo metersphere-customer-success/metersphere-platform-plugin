@@ -513,7 +513,8 @@ public class ZentaoPlatform extends AbstractPlatform {
 			demand.setDemandUrl(zentaoRestClient.getBaseUrl() + "story-view-" + story.getId() + ".html");
 			// add plan to custom fields
 			demand.getCustomFields().put(ZentaoDemandCustomField.PLAN_FIELD_ID, story.getPlan());
-			boolean isParentDemandShow = StringUtils.isBlank(request.getQuery()) || demand.getDemandName().contains(request.getQuery()) || demand.getDemandId().contains(request.getQuery());
+			boolean isParentDemandShow = StringUtils.isBlank(request.getQuery()) || StringUtils.containsIgnoreCase(demand.getDemandName(), request.getQuery()) || StringUtils.containsIgnoreCase(demand.getDemandId(), request.getQuery()) &&
+					(CollectionUtils.isEmpty(request.getExcludeIds()) || !request.getExcludeIds().contains(demand.getDemandId()));
 			if (!CollectionUtils.isEmpty(story.getChildren())) {
 				List<PlatformDemandDTO.Demand> childrenDemands = new ArrayList<>();
 				// handle children demand list
@@ -525,7 +526,8 @@ public class ZentaoPlatform extends AbstractPlatform {
 					childDemand.setParent(demand.getDemandId());
 					// add plan to custom fields
 					childDemand.getCustomFields().put(ZentaoDemandCustomField.PLAN_FIELD_ID, childStory.getPlan());
-					boolean isChildDemandShow = StringUtils.isBlank(request.getQuery()) || childDemand.getDemandName().contains(request.getQuery()) || childDemand.getDemandId().contains(request.getQuery());
+					boolean isChildDemandShow = StringUtils.isBlank(request.getQuery()) || StringUtils.containsIgnoreCase(childDemand.getDemandName(), request.getQuery()) || StringUtils.equalsIgnoreCase(childDemand.getDemandId(), request.getQuery()) &&
+							(CollectionUtils.isEmpty(request.getExcludeIds()) || !request.getExcludeIds().contains(demand.getDemandId()));
 					if (isChildDemandShow) {
 						// 满足过滤条件的子需求, 才展示
 						childrenDemands.add(childDemand);

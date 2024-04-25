@@ -237,7 +237,7 @@ public class JiraDefaultClient extends BaseClient {
 	public Map<String, Object> pageDemand(String projectKey, String issueType, int startAt, int maxResults, String query) {
 		String jql = getBaseUrl() + "/search?jql=project=" + projectKey + "+AND+issuetype=" + issueType +
 				(StringUtils.isNotBlank(query) ? "+AND+summary~\"" + query + "\"" : StringUtils.EMPTY) +
-				"&maxResults=" + maxResults + "&startAt=" + startAt + "&fields=summary,issuetype";
+				"&maxResults=" + maxResults + "&startAt=" + startAt + "&fields=summary,issuetype,subtasks";
 		ResponseEntity<String> responseEntity = restTemplate.exchange(jql, HttpMethod.GET, getAuthHttpEntity(), String.class);
 		// noinspection unchecked
 		return PluginUtils.parseMap(responseEntity.getBody());
