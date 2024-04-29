@@ -1,0 +1,23 @@
+{
+  "id": "integration",
+  "name": "服务集成",
+  "script": [
+    {
+      "name": "account",
+      "type": "INPUT",
+      "label": "API账号",
+      "value": "",
+      "required": true,
+      "tooltip": "账号口令信息在\"公司管理-安全与集成-开放平台\"中查看",
+      "platformPlaceHolder": "请输入API账号"
+    },
+    {
+      "name": "password",
+      "type": "PASSWORD",
+      "label": "API口令",
+      "value": "",
+      "required": true,
+      "platformPlaceHolder": "请输入API口令"
+    }
+  ]
+}

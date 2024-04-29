@@ -1,0 +1,51 @@
+{
+  "id": "project_demand",
+  "name": "需求管理",
+  "script": {
+    "formItems": [
+      {
+        "name": "type",
+        "type": "RADIO",
+        "label": "范围",
+        "value": "products",
+        "subDesc": "",
+        "options": [
+          {
+            "value": "products",
+            "text": "产品"
+          },
+          {
+            "value": "projects",
+            "text": "项目"
+          }
+        ]
+      },
+      {
+        "name": "zentaoKey",
+        "type": "INPUT",
+        "label": "产品 Key",
+        "required": true,
+        "subDesc": "如何填写Key",
+        "inputSearch": false,
+        "instructionsIcon": "static/zentao-key.jpg",
+        "displayConditions": {
+          "field": "type",
+          "value": "products"
+        }
+      },
+      {
+        "name": "zentaoKey",
+        "type": "INPUT",
+        "label": "项目 Key",
+        "required": true,
+        "subDesc": "如何填写Key",
+        "inputSearch": false,
+        "instructionsIcon": "static/zentao-key.jpg",
+        "displayConditions": {
+          "field": "type",
+          "value": "projects"
+        }
+      }
+    ]
+  }
+}

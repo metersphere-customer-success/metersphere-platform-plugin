@@ -12,6 +12,7 @@
     <modules>
         <module>metersphere-jira-plugin</module>
         <module>metersphere-zentao-plugin</module>
+        <module>metersphere-tapd-plugin</module>
     </modules>
 
     <properties>

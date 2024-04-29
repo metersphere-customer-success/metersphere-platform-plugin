@@ -1,0 +1,18 @@
+{
+  "id": "inject_field",
+  "name": "内置平台字段",
+  "script": {
+    "injectFields": [
+      {
+        "id": "assignedTo",
+        "name": "处理人(禅道指派人)",
+        "key": "handleUser",
+        "type": "SELECT",
+        "defaultValue": "",
+        "required": true,
+        "supportSearch": true,
+        "optionMethod": "getAssignUsers"
+      }
+    ]
+  }
+}
