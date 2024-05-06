@@ -169,7 +169,7 @@ public class ZentaoPlatform extends AbstractPlatform {
 	 */
 	@Override
 	public boolean isSupportDefaultTemplate() {
-		// Zentao don't Support Default Template
+		// Zentao currently does not support default templates
 		return false;
 	}
 
@@ -215,7 +215,7 @@ public class ZentaoPlatform extends AbstractPlatform {
 	 * @return 状态选项
 	 */
 	@Override
-	public List<SelectOption> getStatusTransitions(String projectConfig, String issueKey) {
+	public List<SelectOption> getStatusTransitions(String projectConfig, String issueKey, String previousStatus) throws Exception {
 		// Zentao don't support status flow, query all status item and return
 		List<SelectOption> statusOptions = new ArrayList<>();
 		for (ZentaoBugPlatformStatus status : ZentaoBugPlatformStatus.values()) {

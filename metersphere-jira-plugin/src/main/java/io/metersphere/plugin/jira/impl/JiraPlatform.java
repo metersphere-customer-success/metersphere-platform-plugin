@@ -247,7 +247,7 @@ public class JiraPlatform extends AbstractPlatform {
 	 * @return 状态列表
 	 */
 	@Override
-	public List<SelectOption> getStatusTransitions(String projectConfig, String issueKey) {
+	public List<SelectOption> getStatusTransitions(String projectConfig, String issueKey, String previousStatus) throws Exception {
 		JiraProjectConfig config = getProjectConfig(projectConfig);
 		List<SelectOption> statusOptions = new ArrayList<>();
 		if (StringUtils.isBlank(issueKey)) {

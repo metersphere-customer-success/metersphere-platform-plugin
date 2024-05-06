@@ -4,47 +4,16 @@
   "script": {
     "formItems": [
       {
-        "name": "type",
-        "type": "RADIO",
-        "label": "范围",
-        "value": "products",
-        "subDesc": "",
-        "options": [
-          {
-            "value": "products",
-            "text": "产品"
-          },
-          {
-            "value": "projects",
-            "text": "项目"
-          }
-        ]
-      },
-      {
-        "name": "zentaoKey",
+        "name": "tapdKey",
         "type": "INPUT",
-        "label": "产品 Key",
+        "label": "project.menu.projectKey",
+        "value": "",
         "required": true,
-        "subDesc": "如何填写Key",
+        "subDesc": "如何获取TAPD项目Key",
         "inputSearch": false,
-        "instructionsIcon": "static/zentao-key.jpg",
-        "displayConditions": {
-          "field": "type",
-          "value": "products"
-        }
-      },
-      {
-        "name": "zentaoKey",
-        "type": "INPUT",
-        "label": "项目 Key",
-        "required": true,
-        "subDesc": "如何填写Key",
-        "inputSearch": false,
-        "instructionsIcon": "static/zentao-key.jpg",
-        "displayConditions": {
-          "field": "type",
-          "value": "projects"
-        }
+        "instructionsIcon": "static/tapd-key.jpg",
+        "optionMethod": "",
+        "couplingConfig": {}
       }
     ]
   }

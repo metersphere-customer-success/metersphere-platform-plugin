@@ -4,14 +4,14 @@
   "script": {
     "injectFields": [
       {
-        "id": "assignedTo",
-        "name": "处理人(禅道指派人)",
+        "id": "currentOwner",
+        "name": "处理人(Tapd处理人)",
         "key": "handleUser",
         "type": "SELECT",
         "defaultValue": "",
         "required": true,
         "supportSearch": true,
-        "optionMethod": "getAssignUsers"
+        "optionMethod": "getOwnerList"
       }
     ]
   }

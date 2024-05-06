@@ -4,19 +4,21 @@
   "script": {
     "formItems": [
       {
-        "name": "zentaoAccount",
+        "name": "tapdAccount",
         "type": "INPUT",
-        "label": "禅道账号",
-        "tooltip": "禅道账号具有API相应的权限, 请按照参考页面勾选上对应权限{参考页面: 组织-权限-分组-权限维护-API开发}; 还需开启超级Model配置项, 禅道配置文件中$config->features-apiGetModel = true{配置文件参考路径：/opt/zbox/app/zentao/config/my.php};",
+        "label": "API账号",
         "value": "",
-        "required": true
+        "required": true,
+        "tooltip": "账号口令信息在\"公司管理-安全与集成-开放平台\"中查看",
+        "platformPlaceHolder": "请输入API账号"
       },
       {
-        "name": "zentaoPassword",
+        "name": "tapdPassword",
         "type": "PASSWORD",
-        "label": "禅道密码",
+        "label": "API口令",
         "value": "",
-        "required": true
+        "required": true,
+        "platformPlaceHolder": "请输入API口令"
       }
     ]
   }

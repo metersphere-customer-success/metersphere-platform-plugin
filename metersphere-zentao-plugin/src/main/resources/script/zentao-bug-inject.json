@@ -4,7 +4,7 @@
   "script": {
     "injectFields": [
       {
-        "id": "assignedTo",
+        "id": "current_owner",
         "name": "处理人(禅道指派人)",
         "key": "handleUser",
         "type": "SELECT",
