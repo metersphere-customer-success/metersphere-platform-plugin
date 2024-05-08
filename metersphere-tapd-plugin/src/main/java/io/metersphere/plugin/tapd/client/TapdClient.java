@@ -9,22 +9,20 @@ import io.metersphere.plugin.tapd.constants.TapdSystemType;
 import io.metersphere.plugin.tapd.constants.TapdUrl;
 import io.metersphere.plugin.tapd.domain.TapdIntegrationConfig;
 import io.metersphere.plugin.tapd.domain.TapdProject;
+import io.metersphere.plugin.tapd.domain.TapdTransitionStatusItem;
 import io.metersphere.plugin.tapd.domain.response.TapdBaseResponse;
+import io.metersphere.plugin.tapd.domain.response.TapdBugResponse;
 import io.metersphere.plugin.tapd.domain.response.TapdStoryResponse;
-import io.metersphere.plugin.tapd.domain.response.TapdTransitionStatusItem;
 import org.apache.commons.lang3.StringUtils;
-import org.springframework.http.HttpEntity;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpMethod;
-import org.springframework.http.ResponseEntity;
+import org.springframework.http.*;
 import org.springframework.util.CollectionUtils;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.HttpClientErrorException;
+import org.springframework.web.client.RequestCallback;
 
-import java.util.ArrayList;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
+import java.io.InputStream;
+import java.util.*;
+import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
 public class TapdClient extends BaseClient {
@@ -232,6 +230,102 @@ public class TapdClient extends BaseClient {
 			PluginLogUtils.error(e.getMessage(), e);
 		}
 		return storys;
+	}
+
+	/**
+	 * 新增缺陷
+	 *
+	 * @param paramMap   参数Map
+	 * @param projectKey 项目Key
+	 * @return 请求返回
+	 */
+	public TapdBugResponse editBug(MultiValueMap<String, Object> paramMap, String projectKey) {
+		paramMap.add("workspace_id", projectKey);
+		try {
+			ResponseEntity<TapdBaseResponse> response = restTemplate.exchange(ENDPOINT + TapdUrl.EDIT_BUG, HttpMethod.POST,
+					getPostAuthHttpEntityForParam(paramMap), TapdBaseResponse.class);
+			return PluginUtils.parseObject(PluginUtils.toJSONString(PluginUtils.parseMap(
+					PluginUtils.toJSONString(response.getBody().getData())).get("Bug")), TapdBugResponse.class);
+		} catch (Exception e) {
+			PluginLogUtils.error(e.getMessage(), e);
+			throw new MSPluginException("创建Tapd缺陷异常");
+		}
+	}
+
+	/**
+	 * 分页查询缺陷
+	 *
+	 * @param projectKey 项目Key
+	 * @param page       页码
+	 * @param limit      每页大小
+	 * @return
+	 */
+	public List<Map> getBugForPage(String projectKey, int page, int limit) {
+		try {
+			ResponseEntity<TapdBaseResponse> response = restTemplate.exchange(ENDPOINT + TapdUrl.LIST_BUG, HttpMethod.GET,
+					getAuthHttpEntity(), TapdBaseResponse.class, projectKey, page, limit);
+			if (response.getBody() == null || response.getBody().getData() == null) {
+				return new ArrayList<>();
+			}
+			List<Map> bugMaps = PluginUtils.parseArray(PluginUtils.toJSONString(response.getBody().getData()), Map.class);
+			return bugMaps.stream().map(bugMap -> {
+				return (Map) bugMap.get("Bug");
+			}).collect(Collectors.toList());
+		} catch (Exception e) {
+			PluginLogUtils.error(e.getMessage(), e);
+			throw new MSPluginException("分页查询Tapd缺陷异常");
+		}
+	}
+
+	/**
+	 * 获取图片下载链接
+	 *
+	 * @param projectKey 项目Key
+	 * @param imagePath  图片路径
+	 * @return
+	 */
+	public String getPicTmpDownUrl(String projectKey, String imagePath) {
+		try {
+			ResponseEntity<TapdBaseResponse> response = restTemplate.exchange(ENDPOINT + TapdUrl.GET_DOWNLOAD_URL, HttpMethod.GET,
+					getAuthHttpEntity(), TapdBaseResponse.class, projectKey, imagePath);
+			if (response.getBody() == null || response.getBody().getData() == null) {
+				return null;
+			}
+			Map responseDataMap = PluginUtils.parseMap(PluginUtils.toJSONString(response.getBody().getData()));
+			return PluginUtils.parseMap(PluginUtils.toJSONString(responseDataMap.get("Attachment"))).get("download_url").toString();
+		} catch (Exception e) {
+			PluginLogUtils.error(e.getMessage(), e);
+		}
+		return null;
+	}
+
+	/**
+	 * 获取附件字节流
+	 *
+	 * @param fileId             文件ID
+	 * @param inputStreamHandler 流处理
+	 */
+	public void getAttachmentBytes(String fileDownUrl, Consumer<InputStream> inputStreamHandler) {
+		RequestCallback requestCallback = request -> {
+			// 定义请求头的接收类型
+			request.getHeaders().setAccept(Arrays.asList(MediaType.APPLICATION_OCTET_STREAM, MediaType.ALL));
+			request.getHeaders().set(HttpHeaders.ACCEPT_ENCODING, "gzip,x-gzip,deflate");
+		};
+
+		restTemplate.execute(fileDownUrl, HttpMethod.GET,
+				requestCallback, (clientHttpResponse) -> {
+					inputStreamHandler.accept(clientHttpResponse.getBody());
+					return null;
+				});
+	}
+
+	/**
+	 * 获取认证实体
+	 *
+	 * @return
+	 */
+	protected HttpEntity<MultiValueMap<String, Object>> getPostAuthHttpEntityForParam(MultiValueMap<String, Object> paramMap) {
+		return new HttpEntity<>(paramMap, getAuthHeader());
 	}
 
 	/**

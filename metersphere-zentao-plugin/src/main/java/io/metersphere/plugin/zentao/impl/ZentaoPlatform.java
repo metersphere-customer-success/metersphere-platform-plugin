@@ -688,7 +688,7 @@ public class ZentaoPlatform extends AbstractPlatform {
 				msBug.setUpdateTime(System.currentTimeMillis());
 			}
 		} catch (Exception e) {
-			PluginLogUtils.error("parse zentao bug time error: " + e.getMessage());
+			throw new MSPluginException("parse zentao bug time error: " + e.getMessage());
 		}
 	}
 
@@ -990,26 +990,31 @@ public class ZentaoPlatform extends AbstractPlatform {
 		if (StringUtils.isBlank(content)) {
 			return null;
 		}
-		content = content
-				.replaceAll("<img src=\"" + ZENTAO_RICH_TEXT_IMG_SRC_PREFIX, "<img psrc=\"" + ZENTAO_RICH_TEXT_IMG_SRC_PREFIX)
-				.replaceAll("<img src=\"\\{", "<img psrc=\"" + ZENTAO_RICH_TEXT_IMG_SRC_PREFIX).replaceAll("}", StringUtils.EMPTY)
-				.replaceAll("alt=\"" + MS_RICH_TEXT_PREVIEW_SRC_PREFIX, "src=\"" + MS_RICH_TEXT_PREVIEW_SRC_PREFIX);
-		String zentaoLocalRegex = "(<img psrc=\"" + ZENTAO_RICH_TEXT_IMG_SRC_PREFIX + ")(.*?)(alt=\"\" />)";
-		Matcher matcher = Pattern.compile(zentaoLocalRegex).matcher(content);
-		Map<String, String> richFileMap = new HashMap<>(16);
-		while (matcher.find()) {
-			String matchLocalFileUrl = matcher.group(0);
-			String fileRegex = "\\d+";
-			Matcher fileMatch = Pattern.compile(fileRegex).matcher(matchLocalFileUrl);
-			while (fileMatch.find()) {
-				String fileId = fileMatch.group(0);
-				String replaceTmpUrl = matchLocalFileUrl.replaceAll("alt=\"\" />", "alt=\"" + fileId + "\" />");
-				content = content.replaceAll(matchLocalFileUrl, replaceTmpUrl);
-				// 禅道富文本中的图片默认命名为*.jpg, *:唯一文件ID, 标识, 整数
-				richFileMap.put(fileId, fileId + ".jpg");
+		try {
+			content = content
+					.replaceAll("<img src=\"" + ZENTAO_RICH_TEXT_IMG_SRC_PREFIX, "<img psrc=\"" + ZENTAO_RICH_TEXT_IMG_SRC_PREFIX)
+					.replaceAll("<img src=\"\\{", "<img psrc=\"" + ZENTAO_RICH_TEXT_IMG_SRC_PREFIX).replaceAll("}", StringUtils.EMPTY)
+					.replaceAll("alt=\"" + MS_RICH_TEXT_PREVIEW_SRC_PREFIX, "src=\"" + MS_RICH_TEXT_PREVIEW_SRC_PREFIX);
+			String zentaoLocalRegex = "(<img psrc=\"" + ZENTAO_RICH_TEXT_IMG_SRC_PREFIX + ")(.*?)(alt=\"\" />)";
+			Matcher matcher = Pattern.compile(zentaoLocalRegex).matcher(content);
+			Map<String, String> richFileMap = new HashMap<>(16);
+			while (matcher.find()) {
+				String matchLocalFileUrl = matcher.group(0);
+				String fileRegex = "\\d+";
+				Matcher fileMatch = Pattern.compile(fileRegex).matcher(matchLocalFileUrl);
+				while (fileMatch.find()) {
+					String fileId = fileMatch.group(0);
+					String replaceTmpUrl = matchLocalFileUrl.replaceAll("alt=\"\" />", "alt=\"" + fileId + "\" />");
+					content = content.replaceAll(matchLocalFileUrl, replaceTmpUrl);
+					// 禅道富文本中的图片默认命名为*.jpg, *:唯一文件ID, 标识, 整数
+					richFileMap.put(fileId, fileId + ".jpg");
+				}
 			}
+			msBug.setRichTextImageMap(richFileMap);
+			return content;
+		} catch (Exception e) {
+			PluginLogUtils.error("Parse tapd bug description error: " + e.getMessage());
 		}
-		msBug.setRichTextImageMap(richFileMap);
-		return content;
+		return null;
 	}
 }

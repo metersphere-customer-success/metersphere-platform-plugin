@@ -1,4 +1,4 @@
-package io.metersphere.plugin.tapd.domain.response;
+package io.metersphere.plugin.tapd.domain;
 
 import lombok.Data;
 

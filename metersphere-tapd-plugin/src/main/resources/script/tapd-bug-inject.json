@@ -9,7 +9,7 @@
         "key": "handleUser",
         "type": "SELECT",
         "defaultValue": "",
-        "required": true,
+        "required": false,
         "supportSearch": true,
         "optionMethod": "getOwnerList"
       }

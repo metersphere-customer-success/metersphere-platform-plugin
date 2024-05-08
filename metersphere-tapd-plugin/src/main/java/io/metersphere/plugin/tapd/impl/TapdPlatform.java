@@ -3,6 +3,7 @@ package io.metersphere.plugin.tapd.impl;
 import io.metersphere.plugin.platform.dto.SelectOption;
 import io.metersphere.plugin.platform.dto.SyncBugResult;
 import io.metersphere.plugin.platform.dto.request.*;
+import io.metersphere.plugin.platform.dto.response.PlatformBugDTO;
 import io.metersphere.plugin.platform.dto.response.PlatformBugUpdateDTO;
 import io.metersphere.plugin.platform.dto.response.PlatformCustomFieldItemDTO;
 import io.metersphere.plugin.platform.dto.response.PlatformDemandDTO;
@@ -17,16 +18,19 @@ import io.metersphere.plugin.tapd.domain.TapdIntegrationConfig;
 import io.metersphere.plugin.tapd.domain.TapdProject;
 import io.metersphere.plugin.tapd.domain.TapdProjectConfig;
 import io.metersphere.plugin.tapd.domain.TapdUserPlatformInfo;
+import io.metersphere.plugin.tapd.domain.response.TapdBugResponse;
 import io.metersphere.plugin.tapd.domain.response.TapdStoryResponse;
+import org.apache.commons.lang3.SerializationUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.pf4j.Extension;
 import org.springframework.util.CollectionUtils;
+import org.springframework.util.LinkedMultiValueMap;
+import org.springframework.util.MultiValueMap;
 
 import java.io.InputStream;
 import java.lang.reflect.InvocationTargetException;
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.List;
+import java.text.SimpleDateFormat;
+import java.util.*;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
@@ -38,17 +42,31 @@ public class TapdPlatform extends AbstractPlatform {
 
 	protected TapdClient tapdClient;
 
+	protected static final String MS_RICH_TEXT_PREVIEW_SRC_PREFIX = "/bug/attachment/preview/md";
+
+	protected static final String TAPD_RICH_TEXT_PIC_SRC_PREFIX = "/tfl";
+
+	protected SimpleDateFormat sdfDateTime = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+
 	public TapdPlatform(PlatformRequest request) {
 		super(request);
 		TapdIntegrationConfig config = getIntegrationConfig(request.getIntegrationConfig(), TapdIntegrationConfig.class);
 		tapdClient = new TapdClient(config);
 	}
 
+	/**
+	 * 校验集成配置
+	 */
 	@Override
 	public void validateIntegrationConfig() {
 		tapdClient.auth();
 	}
 
+	/**
+	 * 校验用户配置
+	 *
+	 * @param userConfig 用户配置
+	 */
 	@Override
 	public void validateUserConfig(String userConfig) {
 		TapdUserPlatformInfo platformConfig = PluginUtils.parseObject(userConfig, TapdUserPlatformInfo.class);
@@ -59,6 +77,11 @@ public class TapdPlatform extends AbstractPlatform {
 		tapdClient.auth();
 	}
 
+	/**
+	 * 校验项目配置
+	 *
+	 * @param projectConfigStr 项目配置信息
+	 */
 	@Override
 	public void validateProjectConfig(String projectConfigStr) {
 		try {
@@ -75,18 +98,35 @@ public class TapdPlatform extends AbstractPlatform {
 		}
 	}
 
+	/**
+	 * 是否支持第三方模板
+	 *
+	 * @return 支持第三方模板的平台才会在MS平台存在默认模板
+	 */
 	@Override
 	public boolean isSupportDefaultTemplate() {
 		// Tapd currently does not support default templates
 		return false;
 	}
 
+	/**
+	 * 获取第三方平台缺陷的自定义字段
+	 *
+	 * @param projectConfigStr 项目配置信息
+	 * @return 自定义字段集合
+	 */
 	@Override
 	public List<PlatformCustomFieldItemDTO> getDefaultTemplateCustomField(String projectConfig) {
 		// when isSupportDefaultTemplate get true, implement this method;
 		return null;
 	}
 
+	/**
+	 * 获取表单项
+	 *
+	 * @param request 表单项请求参数
+	 * @return 下拉项
+	 */
 	@Override
 	public List<SelectOption> getFormOptions(GetOptionRequest request) {
 		String method = request.getOptionMethod();
@@ -103,12 +143,21 @@ public class TapdPlatform extends AbstractPlatform {
 		}
 	}
 
+	/**
+	 * 获取状态工作流
+	 *
+	 * @param projectConfig  项目配置
+	 * @param issueKey       缺陷ID
+	 * @param previousStatus 当前状态
+	 * @return
+	 * @throws Exception 业务异常
+	 */
 	@Override
 	public List<SelectOption> getStatusTransitions(String projectConfig, String issueKey, String previousStatus) throws Exception {
 		TapdProjectConfig config = getProjectConfig(projectConfig);
 		List<SelectOption> statusOptions = new ArrayList<>();
 		if (StringUtils.isBlank(issueKey)) {
-			// 缺陷ID为空时, 获取起始工作流
+			// issueKey is null, get previous transitions
 			SelectOption firstStepWorkFlow = tapdClient.getFirstStepWorkFlow(TapdSystemType.BUG, config.getTapdKey(), null);
 			statusOptions.add(firstStepWorkFlow);
 		} else {
@@ -117,6 +166,12 @@ public class TapdPlatform extends AbstractPlatform {
 		return statusOptions;
 	}
 
+	/**
+	 * 需求分页查询
+	 *
+	 * @param request 请求参数
+	 * @return
+	 */
 	@Override
 	public PluginPager<PlatformDemandDTO> pageDemand(DemandPageRequest request) {
 		List<PlatformDemandDTO.Demand> demands = queryDemandList(request, null);
@@ -137,6 +192,12 @@ public class TapdPlatform extends AbstractPlatform {
 		}
 	}
 
+	/**
+	 * 根据ID获取需求
+	 *
+	 * @param request 请求参数
+	 * @return
+	 */
 	@Override
 	public PlatformDemandDTO getDemands(DemandRelateQueryRequest request) {
 		DemandPageRequest requestParam = new DemandPageRequest();
@@ -148,44 +209,342 @@ public class TapdPlatform extends AbstractPlatform {
 		return demandRelatePageData;
 	}
 
+	/**
+	 * 新增缺陷
+	 *
+	 * @param request 请求参数
+	 * @return
+	 */
 	@Override
 	public PlatformBugUpdateDTO addBug(PlatformBugUpdateRequest request) {
-		return null;
+		// validate config
+		TapdProjectConfig config = validateAndSetUserConfig(request.getUserPlatformConfig(), request.getProjectConfig());
+
+		// prepare and init tapd param
+		PlatformBugUpdateDTO platformBug = new PlatformBugUpdateDTO();
+		// filter status field
+		PlatformCustomFieldItemDTO statusField = filterStatusTransition(request);
+		// set param
+		MultiValueMap<String, Object> editParam = buildUpdateParam(request, platformBug);
+		editParam.add("status", statusField.getValue());
+		TapdBugResponse tapdBug = tapdClient.editBug(editParam, config.getTapdKey());
+		if (tapdBug != null && StringUtils.isNotBlank(tapdBug.getId())) {
+			platformBug.setPlatformBugKey(tapdBug.getId());
+			platformBug.setPlatformStatus(statusField.getValue().toString());
+		} else {
+			throw new MSPluginException("创建Tapd缺陷失败!");
+		}
+
+		return platformBug;
 	}
 
+	/**
+	 * 更新缺陷
+	 *
+	 * @param request 请求参数
+	 * @return
+	 */
 	@Override
 	public PlatformBugUpdateDTO updateBug(PlatformBugUpdateRequest request) {
-		return null;
+		// validate config
+		TapdProjectConfig config = validateAndSetUserConfig(request.getUserPlatformConfig(), request.getProjectConfig());
+		// prepare and init tapd param
+		PlatformBugUpdateDTO platformBug = new PlatformBugUpdateDTO();
+		// filter status field
+		PlatformCustomFieldItemDTO statusField = filterStatusTransition(request);
+		// set param
+		MultiValueMap<String, Object> editParam = buildUpdateParam(request, platformBug);
+		editParam.add("status", statusField.getValue());
+		editParam.add("id", request.getPlatformBugId());
+		TapdBugResponse tapdBug = tapdClient.editBug(editParam, config.getTapdKey());
+		if (tapdBug != null && StringUtils.isNotBlank(tapdBug.getId())) {
+			platformBug.setPlatformBugKey(tapdBug.getId());
+			platformBug.setPlatformStatus(statusField.getValue().toString());
+		} else {
+			throw new MSPluginException("修改Tapd缺陷失败!");
+		}
+
+		return platformBug;
 	}
 
 	@Override
 	public void deleteBug(String platformBugId) {
-
+		// TODO: Tapd-API currently does not support delete bug
 	}
 
 	@Override
 	public boolean isSupportAttachment() {
+		// TODO: Tapd-API currently does not support attachment uplaod or delete
+		// https://o.tapd.cn/document/api-doc/API%E6%96%87%E6%A1%A3/api_reference/attachment/get_attachments.html
 		return false;
 	}
 
 	@Override
 	public void syncAttachmentToPlatform(SyncAttachmentToPlatformRequest request) {
-
+		// TODO: when isSupportAttachment get true, implement this method;
 	}
 
+	/**
+	 * 同步存量缺陷
+	 *
+	 * @param request
+	 * @return
+	 */
 	@Override
 	public SyncBugResult syncBugs(SyncBugRequest request) {
-		return null;
+		// validate config
+		TapdProjectConfig config = validateConfig(request.getProjectConfig());
+
+		// prepare param
+		SyncBugResult syncResult = new SyncBugResult();
+		List<PlatformBugDTO> bugs = request.getBugs();
+		List<String> syncBugIds = bugs.stream().map(PlatformBugDTO::getPlatformBugId).collect(Collectors.toList());
+
+		// query bug list by page
+		int page = 1, limit = 200, querySize;
+		List<Map> totalQueryBugs = new ArrayList<>();
+		do {
+			List<Map> queryPageBugs = tapdClient.getBugForPage(config.getTapdKey(), page, limit);
+			querySize = queryPageBugs.size();
+			if (querySize > 0) {
+				totalQueryBugs.addAll(queryPageBugs);
+			}
+			page++;
+		} while (querySize >= limit);
+
+		Map<String, Map> queryBugMap = new HashMap<>();
+		totalQueryBugs.forEach(queryBug -> {
+			queryBugMap.put(queryBug.get("id").toString(), queryBug);
+		});
+		// Handle bug that require sync
+		bugs.forEach(bug -> {
+			Map findBug = queryBugMap.get(bug.getPlatformBugId());
+			if (findBug != null) {
+				syncTapdFieldToMsBug(bug, findBug, false, config.getTapdKey());
+				syncResult.getUpdateBug().add(bug);
+			} else {
+				// not found, delete it
+				syncResult.getDeleteBugIds().add(bug.getId());
+			}
+		});
+		return syncResult;
 	}
 
 	@Override
 	public void syncAllBugs(SyncAllBugRequest request) {
+		// validate config
+		TapdProjectConfig config = validateConfig(request.getProjectConfig());
 
+		// prepare page param
+		int page = 1, limit = 200, querySize;
+		try {
+			do {
+				// prepare post process func param
+				List<PlatformBugDTO> needSyncBugs = new ArrayList<>();
+				SyncBugResult syncBugResult = new SyncBugResult();
+
+				// query tapd bug by page
+				List<Map> tapdBugs = tapdClient.getBugForPage(config.getTapdKey(), page, limit);
+				querySize = tapdBugs.size();
+				tapdBugs = filterBySyncCondition(tapdBugs, request);
+				if (!CollectionUtils.isEmpty(tapdBugs)) {
+					for (Map bugMap : tapdBugs) {
+						// transfer tapd bug field to ms
+						PlatformBugDTO bug = new PlatformBugDTO();
+						bug.setId(UUID.randomUUID().toString());
+						bug.setPlatformBugId(bugMap.get("id").toString());
+						syncTapdFieldToMsBug(bug, bugMap, true, config.getTapdKey());
+						needSyncBugs.add(bug);
+					}
+				}
+
+				// set post process func param
+				// common sync post param {syncBugs: all need sync bugs, attachmentMap: all bug attachment}
+				SyncPostParamRequest syncPostParamRequest = new SyncPostParamRequest();
+				syncPostParamRequest.setNeedSyncBugs(needSyncBugs);
+				syncPostParamRequest.setAttachmentMap(syncBugResult.getAttachmentMap());
+				request.getSyncPostProcessFunc().accept(syncPostParamRequest);
+
+				// next page
+				page++;
+			} while (querySize >= limit);
+		} catch (Exception e) {
+			PluginLogUtils.error(e);
+			throw new MSPluginException(e);
+		}
 	}
 
+	/**
+	 * 获取附件下载流
+	 *
+	 * @param fileKey
+	 * @param inputStreamHandler
+	 */
 	@Override
 	public void getAttachmentContent(String fileKey, Consumer<InputStream> inputStreamHandler) {
+		tapdClient.getAttachmentBytes(fileKey, inputStreamHandler);
+	}
 
+	/**
+	 * 根据同步参数过滤缺陷集合
+	 *
+	 * @param tapdBugs tapd缺陷集合
+	 * @param request  同步全量参数
+	 * @return 过滤后的缺陷集合
+	 */
+	private List<Map> filterBySyncCondition(List<Map> tapdBugs, SyncAllBugRequest request) {
+		if (request.getPre() == null || request.getCreateTime() == null) {
+			return tapdBugs;
+		}
+		return tapdBugs.stream().filter(bug -> {
+			long createTimeMills;
+			try {
+				createTimeMills = sdfDateTime.parse(bug.get("created").toString()).getTime();
+				if (request.getPre()) {
+					return createTimeMills <= request.getCreateTime();
+				} else {
+					return createTimeMills >= request.getCreateTime();
+				}
+			} catch (Exception e) {
+				PluginLogUtils.error(e.getMessage());
+				return false;
+			}
+		}).collect(Collectors.toList());
+	}
+
+	/**
+	 * 同步Tapd缺陷字段 => MS字段值
+	 *
+	 * @param msBug
+	 * @param tapdBug
+	 * @param useCustomAllFields
+	 */
+	private void syncTapdFieldToMsBug(PlatformBugDTO msBug, Map tapdBug, boolean useCustomAllFields, String projectKey) {
+		try {
+			// 处理基础字段
+			parseBaseFieldToMsBug(msBug, tapdBug, projectKey);
+			// 处理自定义字段
+			parseCustomFieldToMsBug(msBug, tapdBug, useCustomAllFields);
+		} catch (Exception e) {
+			PluginLogUtils.error(e);
+		}
+	}
+
+	/**
+	 * 解析基础字段到平台缺陷字段
+	 *
+	 * @param msBug      平台缺陷
+	 * @param zenBugInfo 禅道字段集合
+	 */
+	private void parseBaseFieldToMsBug(PlatformBugDTO msBug, Map tapdBugInfo, String projectKey) {
+		// 处理基础字段(TITLE, DESCRIPTION, HANDLE_USER, STATUS)
+		msBug.setTitle(tapdBugInfo.get("title") == null ? StringUtils.EMPTY : tapdBugInfo.get("title").toString());
+		msBug.setDescription(parseTapdPicToMsRichText(tapdBugInfo.get("description") == null ?
+				StringUtils.EMPTY : tapdBugInfo.get("description").toString(), msBug, projectKey));
+		Object ownerObj = tapdBugInfo.get("current_owner");
+		if (ownerObj == null || StringUtils.isBlank(ownerObj.toString())) {
+			msBug.setHandleUser(StringUtils.EMPTY);
+		} else {
+			String ownerStr = ownerObj.toString().replaceAll(";", StringUtils.EMPTY);
+			if (!StringUtils.equals(msBug.getHandleUser(), ownerStr)) {
+				msBug.setHandleUser(ownerStr);
+				msBug.setHandleUsers(StringUtils.isBlank(msBug.getHandleUsers()) ? ownerStr : msBug.getHandleUsers() + "," + ownerStr);
+			}
+		}
+		msBug.setStatus(tapdBugInfo.get("status") == null ? null : tapdBugInfo.get("status").toString());
+		msBug.setCreateUser("admin");
+		msBug.setUpdateUser("admin");
+		try {
+			String created = tapdBugInfo.get("created").toString();
+			String modified = tapdBugInfo.get("modified") == null ? StringUtils.EMPTY : tapdBugInfo.get("modified").toString();
+			if (StringUtils.isNotBlank(created)) {
+				msBug.setCreateTime(sdfDateTime.parse(created).getTime());
+			} else {
+				msBug.setCreateTime(System.currentTimeMillis());
+			}
+			if (StringUtils.isNotBlank(modified)) {
+				msBug.setUpdateTime(sdfDateTime.parse(modified).getTime());
+			} else {
+				msBug.setUpdateTime(System.currentTimeMillis());
+			}
+		} catch (Exception e) {
+			throw new MSPluginException("parse tapd bug time error: " + e.getMessage());
+		}
+	}
+
+	/**
+	 * 解析自定义字段到平台缺陷字段
+	 *
+	 * @param msBug  平台缺陷
+	 * @param zenBug 禅道字段集合
+	 */
+	private void parseCustomFieldToMsBug(PlatformBugDTO msBug, Map tapdBugInfo, boolean useCustomAllFields) {
+		List<PlatformCustomFieldItemDTO> needSyncCustomFields = new ArrayList<>();
+		if (useCustomAllFields) {
+			// 同步全量的时候, 需要同步所有自定义字段
+			tapdBugInfo.keySet().forEach(fieldKey -> {
+				PlatformCustomFieldItemDTO field = new PlatformCustomFieldItemDTO();
+				field.setId(fieldKey.toString());
+				field.setValue(tapdBugInfo.get(fieldKey));
+				needSyncCustomFields.add(field);
+			});
+		} else {
+			// 同步存量缺陷时, 只需同步MS配置的API自定义字段
+			for (PlatformCustomFieldItemDTO field : msBug.getNeedSyncCustomFields()) {
+				needSyncCustomFields.add(SerializationUtils.clone(field));
+			}
+			if (CollectionUtils.isEmpty(needSyncCustomFields)) {
+				return;
+			}
+			needSyncCustomFields.forEach(field -> {
+				field.setValue(tapdBugInfo.get(field.getCustomData()));
+			});
+		}
+		msBug.setCustomFieldList(needSyncCustomFields);
+	}
+
+	/**
+	 * 生成新增, 更新参数
+	 *
+	 * @param request     请求参数
+	 * @param platformBug 平台缺陷
+	 * @return 参数
+	 */
+	private MultiValueMap<String, Object> buildUpdateParam(PlatformBugUpdateRequest request, PlatformBugUpdateDTO platformBug) {
+		MultiValueMap<String, Object> paramMap = new LinkedMultiValueMap<>();
+		paramMap.add("title", request.getTitle());
+		paramMap.add("description", parseRichTextPicToTapd(request.getBaseUrl(), request.getDescription(), platformBug));
+		parseCustomFields(request, paramMap, platformBug);
+		return paramMap;
+	}
+
+	/**
+	 * 解析自定义字段
+	 *
+	 * @param request       请求参数
+	 * @param tapdEditParam 参数
+	 * @param platformBug   平台缺陷
+	 */
+	protected void parseCustomFields(PlatformBugUpdateRequest request, MultiValueMap<String, Object> tapdEditParam, PlatformBugUpdateDTO platformBug) {
+		try {
+			List<PlatformCustomFieldItemDTO> customFields = request.getCustomFieldList();
+			if (!CollectionUtils.isEmpty(customFields)) {
+				for (PlatformCustomFieldItemDTO item : customFields) {
+					if (StringUtils.isNotBlank(item.getCustomData())) {
+						if (StringUtils.equals(item.getCustomData(), "currentOwner")) {
+							// Tapd处理人/创建人
+							platformBug.setPlatformHandleUser(item.getValue().toString());
+							tapdEditParam.add("current_owner", item.getValue());
+						} else {
+							// 其他字段
+							tapdEditParam.add(item.getCustomData(), item.getValue());
+						}
+					}
+				}
+			}
+		} catch (Exception e) {
+			throw new MSPluginException("解析Tapd自定义字段失败: " + e.getMessage());
+		}
 	}
 
 	/**
@@ -197,10 +556,8 @@ public class TapdPlatform extends AbstractPlatform {
 	 */
 	private List<PlatformDemandDTO.Demand> queryDemandList(DemandPageRequest request, List<String> filterIds) {
 		// validate demand config
-		TapdProjectConfig config = getProjectConfig(request.getProjectConfig());
-		if (StringUtils.isBlank(config.getTapdKey())) {
-			throw new MSPluginException("请在项目中配置Tapd的项目Key!");
-		}
+		TapdProjectConfig config = validateConfig(request.getProjectConfig());
+
 		// query demand list no limit
 		List<TapdStoryResponse> storys = tapdClient.getProjectStorys(config.getTapdKey(), request.getStartPage(), Integer.MAX_VALUE);
 		// handle empty data
@@ -229,14 +586,14 @@ public class TapdPlatform extends AbstractPlatform {
 					boolean isChildDemandShow = StringUtils.isBlank(request.getQuery()) || StringUtils.containsIgnoreCase(childDemand.getDemandName(), request.getQuery()) || StringUtils.equalsIgnoreCase(childDemand.getDemandId(), request.getQuery()) &&
 							(CollectionUtils.isEmpty(request.getExcludeIds()) || !request.getExcludeIds().contains(demand.getDemandId()));
 					if (isChildDemandShow) {
-						// 满足过滤条件的子需求, 才展示
+						// When child story meet the condition, show it
 						childrenDemands.add(childDemand);
 					}
 				});
 				demand.setChildren(childrenDemands);
 			}
 			if (isParentDemandShow || !CollectionUtils.isEmpty(demand.getChildren())) {
-				// 满足过滤条件的父需求, 或者有满足过滤条件的子需求, 才展示
+				// When parent story meet the condition or it's child story meet the condition, show the story
 				demands.add(demand);
 			}
 		});
@@ -307,5 +664,131 @@ public class TapdPlatform extends AbstractPlatform {
 			throw new MSPluginException("请在项目中添加项目配置！");
 		}
 		return PluginUtils.parseObject(configStr, TapdProjectConfig.class);
+	}
+
+	/**
+	 * 校验并设置用户配置
+	 *
+	 * @param userPlatformConfig
+	 * @param projectConfig
+	 * @return
+	 */
+	private TapdProjectConfig validateAndSetUserConfig(String userPlatformConfig, String projectConfig) {
+		setUserConfig(userPlatformConfig, true);
+		return validateConfig(projectConfig);
+	}
+
+	/**
+	 * 校验配置
+	 *
+	 * @param userPlatformConfig 用户平台配置
+	 * @param projectConfig      项目配置
+	 */
+	private TapdProjectConfig validateConfig(String projectConfig) {
+		TapdProjectConfig config = getProjectConfig(projectConfig);
+		if (StringUtils.isBlank(config.getTapdKey())) {
+			throw new MSPluginException("请在项目中配置Tapd的项目Key!");
+		}
+		return config;
+	}
+
+	/**
+	 * 过滤出自定义字段中的状态字段
+	 *
+	 * @param request 请求参数
+	 * @return 状态自定义字段
+	 */
+	private PlatformCustomFieldItemDTO filterStatusTransition(PlatformBugUpdateRequest request) {
+		if (!CollectionUtils.isEmpty(request.getCustomFieldList())) {
+			// filter and return bug status by custom fields, then remove it;
+			List<PlatformCustomFieldItemDTO> statusList = request.getCustomFieldList().stream().filter(item ->
+					StringUtils.equals(item.getCustomData(), "status")).toList();
+			request.getCustomFieldList().removeAll(statusList);
+			return statusList.get(0);
+		} else {
+			return null;
+		}
+	}
+
+	/**
+	 * 解析MS富文本图片内容至Tapd
+	 *
+	 * @param content     富文本内容
+	 * @param platformBug 平台缺陷内容
+	 * @return
+	 */
+	private String parseRichTextPicToTapd(String baseUrl, String content, PlatformBugUpdateDTO platformBug) {
+		if (StringUtils.isBlank(content)) {
+			return null;
+		}
+		// psrc => src
+		if (content.contains("psrc")) {
+			// eg: <img psrc="/file-read-zFid.png" src=/bug/attachment/preview/md/pid/fid/true">
+			// => <img src="/file-read-zFid.png" src="/bug/attachment/preview/md/pid/fid/true"/>
+			// 图片双向同步过, 直接替换URL即可
+			content = content.replaceAll("psrc", "src");
+		}
+		if (content.contains("permalinksrc")) {
+			// eg: <img src="/attachment/download/file/pid/fid/true" permalinksrc="/attachment/download/file/pid/fid/true">
+			// => <img src="/baseUrl/attachment/download/file/pid/fid/true" alt="/attachment/download/file/pid/fid/true"/>
+			// 替换的目标Tapd-URL
+			String tapdImgUrl = "<img src=\"" + baseUrl + MS_RICH_TEXT_PREVIEW_SRC_PREFIX;
+			// 替换的源MS-URL正则
+			String sourceRegex = "<img src=\"" + MS_RICH_TEXT_PREVIEW_SRC_PREFIX;
+			// 保留permalinksrc链接, 同步至MS时备用
+			content = content.replaceAll(sourceRegex, tapdImgUrl).replaceAll("permalinksrc", "alt");
+		}
+		// 保留MS-URL中的一些参数{src}
+		content = content.replaceAll("src=\"" + MS_RICH_TEXT_PREVIEW_SRC_PREFIX, "alt=\"" + MS_RICH_TEXT_PREVIEW_SRC_PREFIX);
+
+		// MS-URL, 需同步修改为Tapd可识别的URL
+		String msUrl = content.replaceAll("src=\"" + baseUrl, "psrc=\"" + baseUrl)
+				.replaceAll("alt=\"" + MS_RICH_TEXT_PREVIEW_SRC_PREFIX, "src=\"" + MS_RICH_TEXT_PREVIEW_SRC_PREFIX);
+		platformBug.setPlatformDescription(msUrl);
+		// 图片链接中存在HTTP-URL, 不用替换
+		return content;
+	}
+
+	/**
+	 * 解析Tapd富文本图片至MS
+	 *
+	 * @param content 富文本内容
+	 * @param msBug   MS缺陷
+	 * @return
+	 */
+	private String parseTapdPicToMsRichText(String content, PlatformBugDTO msBug, String projectKey) {
+		// 图片链接中存在本地上传的URL, 及已经双向同步的URL, 网络链接的URL
+		// eg: <img src="/base-url/attachment/download/file/pid/fid/true" alt="/attachment/download/file/pid/fid/true" 需处理, 已双向同步无需下载
+		// eg: <img src="/tfl/*" alt /> Tapd本地上传的图片, 获取下载URL
+		// eg: <img src="https.pic.s" alt /> 不用处理
+		if (StringUtils.isBlank(content)) {
+			return null;
+		}
+		try {
+			String[] splitStr = content.split("<img");
+			Map<String, String> richFileMap = new HashMap<>(16);
+			for (String imgStr : splitStr) {
+				if (imgStr.contains(MS_RICH_TEXT_PREVIEW_SRC_PREFIX)) {
+					String replaceTmpUrl = imgStr.replaceAll("src", "psrc").replaceAll("alt", "src");
+					content = content.replace(imgStr, replaceTmpUrl);
+					continue;
+				}
+				if (imgStr.contains(TAPD_RICH_TEXT_PIC_SRC_PREFIX)) {
+					String tapdUrlKey = imgStr.substring(imgStr.indexOf("src=\"") + 5, imgStr.indexOf("\" "));
+					String picTmpDownUrl = tapdClient.getPicTmpDownUrl(projectKey, tapdUrlKey);
+					if (StringUtils.isNotBlank(picTmpDownUrl)) {
+						String replaceTmpUrl = imgStr.replaceAll("src", "psrc").replaceAll("/>", "alt=\"" + picTmpDownUrl + "\" />");
+						content = content.replaceAll(imgStr, replaceTmpUrl);
+						// 禅道富文本中的图片默认命名为*.jpg, *:唯一文件ID, 标识, 整数
+						richFileMap.put(picTmpDownUrl, UUID.randomUUID() + ".jpg");
+					}
+				}
+			}
+			msBug.setRichTextImageMap(richFileMap);
+			return content;
+		} catch (Exception e) {
+			PluginLogUtils.error("Parse tapd bug description error: " + e.getMessage());
+		}
+		return null;
 	}
 }
