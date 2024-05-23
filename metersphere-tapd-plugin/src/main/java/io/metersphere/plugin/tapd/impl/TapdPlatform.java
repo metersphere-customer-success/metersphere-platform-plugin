@@ -445,7 +445,12 @@ public class TapdPlatform extends AbstractPlatform {
 		if (ownerObj == null || StringUtils.isBlank(ownerObj.toString())) {
 			msBug.setHandleUser(StringUtils.EMPTY);
 		} else {
-			String ownerStr = ownerObj.toString().replaceAll(";", StringUtils.EMPTY);
+			String ownerStr;
+			if (ownerObj.toString().contains(";")) {
+				ownerStr = List.of(ownerObj.toString().split(";")).get(0);
+			} else {
+				ownerStr = ownerObj.toString();
+			}
 			if (!StringUtils.equals(msBug.getHandleUser(), ownerStr)) {
 				msBug.setHandleUser(ownerStr);
 				msBug.setHandleUsers(StringUtils.isBlank(msBug.getHandleUsers()) ? ownerStr : msBug.getHandleUsers() + "," + ownerStr);
