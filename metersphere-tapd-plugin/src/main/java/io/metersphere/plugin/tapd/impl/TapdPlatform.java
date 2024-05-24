@@ -726,30 +726,12 @@ public class TapdPlatform extends AbstractPlatform {
 		if (StringUtils.isBlank(content)) {
 			return null;
 		}
-		// psrc => src
-		if (content.contains("psrc")) {
-			// eg: <img psrc="/file-read-zFid.png" src=/bug/attachment/preview/md/pid/fid/true">
-			// => <img src="/file-read-zFid.png" src="/bug/attachment/preview/md/pid/fid/true"/>
-			// 图片双向同步过, 直接替换URL即可
-			content = content.replaceAll("psrc", "src");
-		}
+		platformBug.setPlatformDescription(content);
 		if (content.contains("permalinksrc")) {
-			// eg: <img src="/attachment/download/file/pid/fid/true" permalinksrc="/attachment/download/file/pid/fid/true">
-			// => <img src="/baseUrl/attachment/download/file/pid/fid/true" alt="/attachment/download/file/pid/fid/true"/>
-			// 替换的目标Tapd-URL
-			String tapdImgUrl = "<img src=\"" + baseUrl + MS_RICH_TEXT_PREVIEW_SRC_PREFIX;
-			// 替换的源MS-URL正则
-			String sourceRegex = "<img src=\"" + MS_RICH_TEXT_PREVIEW_SRC_PREFIX;
-			// 保留permalinksrc链接, 同步至MS时备用
-			content = content.replaceAll(sourceRegex, tapdImgUrl).replaceAll("permalinksrc", "alt");
+			// 不保留permalinksrc链接, 不支持双向同步
+			String permalinkRegex = "(permalinksrc=\"" + MS_RICH_TEXT_PREVIEW_SRC_PREFIX + "/)(\\d+)(/(\\d+)" + "/true)";
+			content = content.replaceAll(permalinkRegex, "alt =\"暂不支持图片同步");
 		}
-		// 保留MS-URL中的一些参数{src}
-		content = content.replaceAll("src=\"" + MS_RICH_TEXT_PREVIEW_SRC_PREFIX, "alt=\"" + MS_RICH_TEXT_PREVIEW_SRC_PREFIX);
-
-		// MS-URL, 需同步修改为Tapd可识别的URL
-		String msUrl = content.replaceAll("src=\"" + baseUrl, "psrc=\"" + baseUrl)
-				.replaceAll("alt=\"" + MS_RICH_TEXT_PREVIEW_SRC_PREFIX, "src=\"" + MS_RICH_TEXT_PREVIEW_SRC_PREFIX);
-		platformBug.setPlatformDescription(msUrl);
 		// 图片链接中存在HTTP-URL, 不用替换
 		return content;
 	}
@@ -773,11 +755,6 @@ public class TapdPlatform extends AbstractPlatform {
 			String[] splitStr = content.split("<img");
 			Map<String, String> richFileMap = new HashMap<>(16);
 			for (String imgStr : splitStr) {
-				if (imgStr.contains(MS_RICH_TEXT_PREVIEW_SRC_PREFIX)) {
-					String replaceTmpUrl = imgStr.replaceAll("src", "psrc").replaceAll("alt", "src");
-					content = content.replace(imgStr, replaceTmpUrl);
-					continue;
-				}
 				if (imgStr.contains(TAPD_RICH_TEXT_PIC_SRC_PREFIX)) {
 					String tapdUrlKey = imgStr.substring(imgStr.indexOf("src=\"") + 5, imgStr.indexOf("\" "));
 					String picTmpDownUrl = tapdClient.getPicTmpDownUrl(projectKey, tapdUrlKey);
