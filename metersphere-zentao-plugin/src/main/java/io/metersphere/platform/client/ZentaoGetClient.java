@@ -1,11 +1,11 @@
 package io.metersphere.platform.client;
 
 
-import io.metersphere.platform.domain.RequestUrl;
+import io.metersphere.platform.domain.ZentaoJsonApiUrl;
 
 import java.util.regex.Pattern;
 
-public class ZentaoGetClient extends ZentaoClient {
+public class ZentaoGetClient extends BaseZentaoJsonClient {
 
     private static final String LOGIN = "/?m=user&f=login&t=json&zentaosid=";
     private static final String SESSION_GET="/?m=api&f=getSessionID&t=json";
@@ -29,7 +29,7 @@ public class ZentaoGetClient extends ZentaoClient {
      */
     private static final String BUG_LIST_URL = "/?m=bug&f=browse&productID={0}&branch=&browseType=all&param=0&orderBy=&recTotal={1}&recPerPage={2}&pageID={3}&t=json&zentaosid={4}";
 
-    RequestUrl request = new RequestUrl();
+    ZentaoJsonApiUrl request = new ZentaoJsonApiUrl();
 
     public ZentaoGetClient(String url) {
         super(url);

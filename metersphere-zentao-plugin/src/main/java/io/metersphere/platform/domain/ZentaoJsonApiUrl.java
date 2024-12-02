@@ -7,7 +7,7 @@ import java.util.regex.Pattern;
 
 @Getter
 @Setter
-public class RequestUrl {
+public class ZentaoJsonApiUrl {
     private String login;
     private String sessionGet;
     private String bugCreate;

@@ -1,11 +1,11 @@
 package io.metersphere.platform.client;
 
 
-import io.metersphere.platform.domain.RequestUrl;
+import io.metersphere.platform.domain.ZentaoJsonApiUrl;
 
 import java.util.regex.Pattern;
 
-public class ZentaoPathInfoClient extends ZentaoClient {
+public class ZentaoPathInfoClient extends BaseZentaoJsonClient {
 
     private static final String LOGIN = "/user-login.json?zentaosid=";
     private static final String SESSION_GET = "/api-getsessionid.json";
@@ -15,22 +15,29 @@ public class ZentaoPathInfoClient extends ZentaoClient {
     private static final String BUG_GET = "/api-getModel-bug-getById-bugID={1}.json?zentaosid={2}";
     private static final String STORY_GET = "/api-getModel-story-getProductStories-productID={key}.json?zentaosid=";
     private static final String USER_GET = "/api-getModel-user-getList.json?zentaosid=";
-    private static final String BUILDS_GET = "/api-getModel-build-getProductBuildPairs-productID={0}.json?zentaosid={1}";
+    //private static final String BUILDS_GET = "/api-getModel-build-getProductBuildPairs-productID={0}.json?zentaosid={1}";
+    private static final String BUILDS_GET = "/api-getModel-build-getProductBuildPairs-productID={0}.json";
+
     private static final String BUILDS_GET_V17 = "/api-getModel-build-getBuildPairs-productID={0}.json?zentaosid={1}";
-    private static final String CREATE_META_DATA="/bug-create-{0}.json?zentaosid={1}";
-    private static final String FILE_UPLOAD = "/api-getModel-file-saveUpload-objectType=bug,objectID={1}.json?zentaosid={2}";
+   // private static final String CREATE_META_DATA="/bug-create-{0}.json?zentaosid={1}";
+   private static final String CREATE_META_DATA="/bug-create-{0}.json";
+   private static final String FILE_UPLOAD = "/api-getModel-file-saveUpload-objectType=bug,objectID={1}.json?zentaosid={2}";
+  // private static final String FILE_UPLOAD = "/api-getModel-file-saveUpload-objectType=bug,objectID={1}.json";
+
     private static final String FILE_DELETE = "/file-delete-{1}-.yes.json?zentaosid={2}";
     private static final String FILE_DOWNLOAD="/file-download-{1}-.click.json?zentaosid={2}";
     private static final String REPLACE_IMG_URL = "<img src=\"%s/file-read-$1\"/>";
     private static final Pattern IMG_PATTERN = Pattern.compile("file-read-(.*?)\"/>");
     private static final String PRODUCT_GET = "/product-view-{0}.json?zentaosid={1}";
-    private static final String BUG_LIST_URL = "/bug-browse-{1}-0-all-0--{2}-{3}-{4}.json?&zentaosid={5}";
+
+    //private static final String BUG_LIST_URL = "/bug-browse-{1}-0-all-0--{2}-{3}-{4}.json?&zentaosid={5}";
+    private static final String BUG_LIST_URL = "/bug-browse-{1}-0-all-0--{2}-{3}-{4}.json";
 
     public ZentaoPathInfoClient(String url) {
         super(url);
     }
 
-    protected RequestUrl request = new RequestUrl();
+    protected ZentaoJsonApiUrl request = new ZentaoJsonApiUrl();
 
     {
         request.setLogin(getUrl(LOGIN));
