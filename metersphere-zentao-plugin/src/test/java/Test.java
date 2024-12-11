@@ -101,7 +101,9 @@ public class Test {
   @org.testng.annotations.Test
     public void updateIssue(){
       Map<String, Object> paramMap1 = new LinkedHashMap<>();
-      paramMap1.put("project","1");
+
+      paramMap1.put("project","4");
+
 
       paramMap1.put("title","MSv2.10.10缺陷");
       paramMap1.put("severity","2");
@@ -110,7 +112,8 @@ public class Test {
       List<String> list=new ArrayList<>();
       list.add("主干");
       paramMap1.put("openedBuild",list);
-      zentaorestClient.updateIssue("1",paramMap1);
+     // paramMap1.put("status","resolved");
+      zentaorestClient.updateIssue("46",paramMap1);
 
   }
   @org.testng.annotations.Test
@@ -229,6 +232,21 @@ public class Test {
         if(file.exists()) {
             zentaoJsonClient.uploadAttachment("bug", "53", file);
         }
+    }
+
+    @org.testng.annotations.Test
+    public void closeBug(){
+      zentaorestClient.closeBug("46");
+    }
+    @org.testng.annotations.Test
+    public void activeBug(){
+        ResponseEntity response= zentaorestClient.activeBug("45","lijx");
+        System.out.println(response);
+    }
+
+    @org.testng.annotations.Test
+    public void  resolveBug(){
+      zentaorestClient.resolveBug("45","lijx","bydesign");
     }
 
 

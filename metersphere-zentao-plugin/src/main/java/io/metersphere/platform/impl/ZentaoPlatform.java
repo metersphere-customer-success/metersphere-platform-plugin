@@ -2,6 +2,7 @@ package io.metersphere.platform.impl;
 
 import io.metersphere.platform.client.BaseZentaoJsonClient;
 import io.metersphere.platform.domain.response.rest.*;
+import io.metersphere.platform.enums.ZentaoBugPlatformStatus;
 import io.metersphere.plugin.exception.MSPluginException;
 import io.metersphere.plugin.utils.JSON;
 import io.metersphere.plugin.utils.LogUtil;
@@ -83,10 +84,12 @@ public class ZentaoPlatform extends AbstractPlatform {
     public IssuesWithBLOBs updateIssue(PlatformIssuesUpdateRequest request) {
         setUserConfig(request.getUserPlatformUserConfig());
         Map<String, Object> param = buildUpdateParam(request);
+        LogUtil.info("更新缺陷请求："+request);
         if (request.getTransitions() != null) {
             request.setPlatformStatus(request.getTransitions().getValue());
         }
         this.handleZentaoBugStatus(param);
+        LogUtil.info("更新缺陷参数："+param);
         zentaoRestClient.updateIssue(request.getPlatformId(), param);
         return request;
     }
@@ -257,7 +260,7 @@ public class ZentaoPlatform extends AbstractPlatform {
             if(projectConfig.getZentaoId().contains("-")) {
                 builds = zentaoRestClient.getBuilds(projectConfig.getZentaoId().split("-")[1]);
             }
-            
+
         } catch (Exception e) {
            // builds = zentaoClient.getBuildsV17(projectConfig.getZentaoId());
         }
@@ -327,10 +330,13 @@ public class ZentaoPlatform extends AbstractPlatform {
 
                 // 获取禅道平台缺陷
                 Map<String, Object> response = zentaoJsonClient.getBugsByProductId(pageNum, pageSize,productId,zentaoRestClient);
+
                 LinkedHashMap<String,LinkedHashMap>  bugs = (LinkedHashMap<String,LinkedHashMap>) response.get("bugs");
+                LogUtil.info("根据产品获取缺陷："+bugs);
                 List<Map>   zentaoIssues=new ArrayList<Map>(bugs.values());
                 if(StringUtils.isNotBlank(projectId)){
                     zentaoIssues = zentaoIssues.stream().filter(map -> ( map.get("project").toString().equals(projectId))).collect(Collectors.toList());
+                    LogUtil.info("提取项目缺陷："+zentaoIssues);
                 }
 
                 currentSize = zentaoIssues.size();
@@ -341,6 +347,8 @@ public class ZentaoPlatform extends AbstractPlatform {
 
                 if (syncRequest != null) {
                     zentaoIssues = filterSyncZentaoIssuesByCreated(zentaoIssues, syncRequest);
+                    LogUtil.info("同步请求设置的过滤时间："+ syncRequest.getCreateTime().longValue());
+                    LogUtil.info("按创建时间过滤缺陷："+zentaoIssues);
                 }
 
                 if (CollectionUtils.isNotEmpty(zentaoIssues)) {
@@ -743,6 +751,9 @@ public class ZentaoPlatform extends AbstractPlatform {
         if (issuesRequest.getTransitions() != null) {
             multiParamMap.add("status", issuesRequest.getTransitions().getValue());
         }
+        if(issuesRequest.getPlatformId()!=null){
+            multiParamMap.add("zentaoKey",issuesRequest.getPlatformId());
+        }
 
         addCustomFields(issuesRequest, multiParamMap);
 
@@ -788,23 +799,18 @@ public class ZentaoPlatform extends AbstractPlatform {
             return;
         }
         Object status = param.get("status");
-        if (status!=null) {
-            return;
-        }
-        try {
-            SimpleDateFormat format = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+        if(status!=null) {
             String str = (String) status;
-            if (StringUtils.equals(str, "resolved")) {
-                param.put("resolvedDate", format.format(new Date()));
-            } else if (StringUtils.equals(str, "closed")) {
-                param.put("closedDate", format.format(new Date()));
-                if (!param.containsKey("resolution")) {
-                    // 解决方案默认为已解决
-                    param.put("resolution", "fixed");
+            if (StringUtils.equals(str, ZentaoBugPlatformStatus.resolved.name())) {
+                if(param.containsKey("resolution")) {
+                    //解决bug 解决方案是必填参数
+                    zentaoRestClient.resolveBug((String) param.get("zentaoKey"), (String) param.get("assignedTo"),(String)param.get("resolution"));
                 }
+            } else if (StringUtils.equals(str, ZentaoBugPlatformStatus.closed.name())) {
+                zentaoRestClient.closeBug((String)param.get("zentaoKey"));
+            } else {
+                zentaoRestClient.activeBug((String)param.get("zentaoKey"), (String)param.get("assignedTo"));
             }
-        } catch (Exception e) {
-            //
         }
     }
 

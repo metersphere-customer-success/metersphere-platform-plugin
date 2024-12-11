@@ -3,9 +3,10 @@ package io.metersphere.platform.domain;
 import java.util.Objects;
 
 public enum ZentaoIssuePlatformStatus {
-    created("新建"), active("激活"), closed("已关闭"), delete("删除"), resolved("已解决"),
+//    created("新建"), active("激活"), closed("已关闭"), delete("删除"), resolved("已解决"),
+//    ;
+     active("激活"), resolved("已解决"),closed("已关闭"),
     ;
-
     private final String name;
 
     ZentaoIssuePlatformStatus(String name) {

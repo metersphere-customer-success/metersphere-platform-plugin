@@ -54,7 +54,7 @@
         "i18n": true,
         "label": "project.zentao_id",
         "withProjectCheck": true,
-        "instructionsTip": "项目填写格式：产品ID-项目ID，产品仅填写：产品ID"
+        "instructionsTip": "项目填写格式：产品ID-项目ID （注：通常情况下, 禅道的项目会默认关联产品，项目型项目会关联影子产品Key; 请按照上述提示正确填写产品Key, 否则影响数据的同步），产品仅填写：产品ID,"
       }
     ]
   },

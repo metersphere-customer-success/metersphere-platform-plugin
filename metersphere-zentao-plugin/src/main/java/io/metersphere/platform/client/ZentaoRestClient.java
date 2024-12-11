@@ -343,4 +343,35 @@ public class ZentaoRestClient extends BaseClient {
         //LogUtil.info("获取图片响应:"+response);
         return response;
     }
+
+    /**
+     * 解决BUG
+     */
+    public void resolveBug(String zentaoKey, String assignedTo,String resolution) {
+        ObjectNode jsonObj = objectMapper.createObjectNode();
+        jsonObj.put("comment", StringUtils.EMPTY);
+        jsonObj.put("assignedTo", assignedTo);
+        jsonObj.put("resolution",resolution);
+        restTemplate.exchange(getRestUrl(ZentaoRestApiUrl.RESOLVE_BUG, null), HttpMethod.POST, getJsonHttpEntityWithToken(JSON.toJSONString(jsonObj)), String.class, zentaoKey);
+    }
+
+    /**
+     * 关闭BUG
+     */
+    public void closeBug(String zentaoKey) {
+        ObjectNode jsonObj = objectMapper.createObjectNode();
+        jsonObj.put("comment", StringUtils.EMPTY);
+        restTemplate.exchange(getRestUrl(ZentaoRestApiUrl.CLOSE_BUG, null), HttpMethod.POST, getJsonHttpEntityWithToken(JSON.toJSONString(jsonObj)), String.class, zentaoKey);
+    }
+
+    /**
+     * 激活BUG
+     */
+    public ResponseEntity activeBug(String zentaoKey, String assignedTo) {
+        ObjectNode jsonObj = objectMapper.createObjectNode();
+        //jsonObj.put("comment", StringUtils.EMPTY);
+        //jsonObj.put("assignedTo", assignedTo);
+        ResponseEntity response= restTemplate.exchange(getRestUrl(ZentaoRestApiUrl.ACTIVE_BUG, null), HttpMethod.POST, getJsonHttpEntityWithToken(JSON.toJSONString(jsonObj)), String.class, zentaoKey);
+        return response;
+    }
 }
