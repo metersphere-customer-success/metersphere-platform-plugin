@@ -406,4 +406,11 @@ public abstract class JiraAbstractClient extends BaseClient {
         return (JiraComponentProject) getResultForObject(JiraComponentProject.class, response);
 
     };
+
+    public List<JiraComponentProject> getProjectAllComponents(String jiraKey){
+        ResponseEntity<String> response = restTemplate.exchange(getBaseUrl() + "/project/"+jiraKey+"/components", HttpMethod.GET, getAuthHttpEntity(), String.class);
+
+        return (List<JiraComponentProject>)getResultForList(JiraComponentProject.class, response);
+    }
+
 }

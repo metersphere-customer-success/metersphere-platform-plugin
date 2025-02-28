@@ -105,13 +105,13 @@
       },
       {
         "name": "componentId",
-        "type": "input",
+        "type": "select",
         "defaultValue": "",
         "required": true,
         "i18n": true,
-        "label": "JIRA项目的模块id",
-        "withProjectCheck": true,
-        "instructionsIcon": "/static/component-id.png"
+        "cascade": "jiraKey",
+        "optionMethod": "getProjectAllComponents",
+        "label": "JIRA项目的模块"
       },
 
       {

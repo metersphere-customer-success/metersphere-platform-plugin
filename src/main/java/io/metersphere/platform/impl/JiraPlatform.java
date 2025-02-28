@@ -3,6 +3,8 @@ package io.metersphere.platform.impl;
 
 import io.metersphere.base.domain.IssuesWithBLOBs;
 import io.metersphere.platform.api.AbstractPlatform;
+import io.metersphere.platform.client.JiraAbstractClient;
+import io.metersphere.platform.client.JiraClient9X;
 import io.metersphere.platform.client.JiraClientV2;
 import io.metersphere.platform.constants.AttachmentSyncType;
 import io.metersphere.platform.constants.CustomFieldType;
@@ -63,6 +65,14 @@ public class JiraPlatform extends AbstractPlatform {
 
     public JiraConfig setConfig() {
         JiraConfig config = getIntegrationConfig();
+        switch (config.getVersion()) {
+            case "9":
+                this.jiraClientV2 = new JiraClient9X();
+                validateConfig(config);
+                this.jiraClientV2.setConfig(config);
+                return config;
+        }
+        this.jiraClientV2 =  new JiraClientV2();
         validateConfig(config);
         jiraClientV2.setConfig(config);
         return config;
@@ -462,6 +472,14 @@ public class JiraPlatform extends AbstractPlatform {
                 .map(item -> new SelectOption(item.getName(), item.getId()))
                 .collect(Collectors.toList());
     }
+    public List<SelectOption> getProjectAllComponents(GetOptionRequest request){
+       // MSPluginException.throwException("请配置模块");
+        JiraProjectConfig projectConfig = getProjectConfig(request.getProjectConfig());
+        return  jiraClientV2.getProjectAllComponents(projectConfig.getJiraKey())
+                .stream()
+                .map(item -> new SelectOption(item.getName(), item.getId()))
+                .collect(Collectors.toList());
+    }
 
     public List<SelectOption> getSprintOptions(GetOptionRequest request) {
         return jiraClientV2.getSprint(request.getQuery())
@@ -749,11 +767,11 @@ public class JiraPlatform extends AbstractPlatform {
                 MSPluginException.throwException("项目不存在");
             }
             //验证模块
-            JiraComponentProject componentProject=jiraClientV2.getComponent(projectConfig.getComponentId());
-            if(componentProject==null || !StringUtils.equals(Integer.toString(componentProject.getProjectId()),project.getId())) {
-                MSPluginException.throwException("模块不存在");
-
-            }
+//            JiraComponentProject componentProject=jiraClientV2.getComponent(projectConfig.getComponentId());
+//            if(componentProject==null || !StringUtils.equals(Integer.toString(componentProject.getProjectId()),project.getId())) {
+//                MSPluginException.throwException("模块不存在");
+//
+//            }
         } catch (Exception e) {
             LogUtil.error(e);
             MSPluginException.throwException(e.getMessage());

@@ -13,4 +13,5 @@ public class JiraConfig {
     private String url;
     private String issuetype;
     private String storytype;
+    private String version;
 }
